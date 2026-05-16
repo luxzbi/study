@@ -1,0 +1,17 @@
+{
+  "name": "math-board-archive",
+  "version": "1.0.0",
+  "description": "Daily classroom board photo archive",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node server.js"
+  },
+  "keywords": [
+    "classroom",
+    "photos",
+    "archive"
+  ],
+  "author": "",
+  "license": "MIT"
+}
