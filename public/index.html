@@ -166,6 +166,15 @@ input[type="file"]{width:100%;color:var(--muted)}
 .login-card p{font-size:13px;color:var(--muted);margin-bottom:18px}
 .form{display:grid;gap:10px}
 .form .hbtn{width:100%;height:40px}
+.memo-section{border-bottom:1px solid var(--line);background:#0c0c0c}
+.memo-view{display:flex;align-items:flex-start;gap:8px;padding:12px 16px;min-height:44px}
+.memo-text{flex:1;font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-all}
+.memo-text a{color:var(--good);text-decoration:none}
+.memo-text a:hover{text-decoration:underline}
+.memo-text.empty{color:var(--muted2);font-style:italic}
+.memo-edit{padding:12px 16px;display:grid;gap:8px}
+.memo-edit textarea{width:100%;min-height:72px;resize:vertical;font-size:13px;line-height:1.6;padding:8px 10px;background:var(--bg3);border:1px solid var(--line2);color:var(--text);border-radius:6px}
+.memo-actions{display:flex;gap:8px}
 .toast{
   position:fixed;left:50%;bottom:22px;z-index:50;transform:translateX(-50%) translateY(18px);
   background:#1c1c1c;border:1px solid var(--line2);padding:10px 14px;border-radius:7px;
@@ -244,6 +253,20 @@ input[type="file"]{width:100%;color:var(--muted)}
           <span class="small" id="photoCount"></span>
         </div>
         <button class="hbtn" id="toggleUploadBtn">업로드</button>
+      </div>
+
+      <div class="memo-section hidden" id="memoSection">
+        <div class="memo-view" id="memoView">
+          <div class="memo-text empty" id="memoText">메모 없음 (✎ 클릭하여 추가)</div>
+          <button class="icon-btn" id="memoEditBtn" title="메모 수정" style="font-size:14px;flex:0 0 auto">✎</button>
+        </div>
+        <div class="memo-edit hidden" id="memoEditArea">
+          <textarea id="memoInput" placeholder="메모를 입력하세요. URL은 자동으로 링크됩니다."></textarea>
+          <div class="memo-actions">
+            <button class="hbtn primary" id="memoSaveBtn" type="button">저장</button>
+            <button class="hbtn" id="memoCancelBtn" type="button">취소</button>
+          </div>
+        </div>
       </div>
 
       <form class="upload" id="uploadForm">
@@ -461,6 +484,8 @@ async function loadPhotos(date) {
   empty.classList.toggle('hidden', photos.length > 0);
   empty.textContent = `${date}에 올라온 사진이 없습니다. 업로드 버튼으로 추가해 주세요.`;
 
+  loadMemo(date);
+
   for (const photo of photos) {
     const index = photos.indexOf(photo);
     const item = document.createElement('article');
@@ -647,6 +672,57 @@ $('#uploadForm').addEventListener('submit', async (event) => {
   } finally {
     $('#uploadForm button[type="submit"]').disabled = false;
   }
+});
+
+function linkify(text) {
+  const safe = text.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  return safe.replace(/(https?:\/\/[^\s]+)/g, '<a href="$1" target="_blank" rel="noreferrer">$1</a>');
+}
+
+async function loadMemo(date) {
+  try {
+    const data = await api(`/api/days/${date}/memo`);
+    renderMemo(data.memo || '');
+  } catch { renderMemo(''); }
+}
+
+function renderMemo(memo) {
+  const el = $('#memoText');
+  if (memo.trim()) {
+    el.classList.remove('empty');
+    el.innerHTML = linkify(memo);
+  } else {
+    el.classList.add('empty');
+    el.textContent = '메모 없음 (✎ 클릭하여 추가)';
+  }
+  $('#memoInput').value = memo;
+  $('#memoSection').classList.remove('hidden');
+  $('#memoEditArea').classList.add('hidden');
+  $('#memoView').classList.remove('hidden');
+}
+
+$('#memoEditBtn').addEventListener('click', () => {
+  $('#memoView').classList.add('hidden');
+  $('#memoEditArea').classList.remove('hidden');
+  $('#memoInput').focus();
+});
+
+$('#memoCancelBtn').addEventListener('click', () => {
+  $('#memoEditArea').classList.add('hidden');
+  $('#memoView').classList.remove('hidden');
+});
+
+$('#memoSaveBtn').addEventListener('click', async () => {
+  const memo = $('#memoInput').value;
+  try {
+    await api(`/api/days/${state.selectedDate}/memo`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ memo })
+    });
+    renderMemo(memo);
+    toast('메모를 저장했습니다.');
+  } catch (error) { toast(error.message); }
 });
 
 $('#uploadDate').value = today();

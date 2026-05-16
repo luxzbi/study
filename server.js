@@ -374,6 +374,21 @@ async function route(req, res) {
       return json(res, 200, { days: await listDays() });
     }
 
+    const memoMatch = /^\/api\/days\/(\d{4}-\d{2}-\d{2})\/memo$/.exec(pathname);
+    if (req.method === 'GET' && memoMatch) {
+      const fb = getFirebase();
+      const doc = await fb.db.collection('memos').doc(memoMatch[1]).get();
+      return json(res, 200, { memo: doc.exists ? (doc.data().memo || '') : '' });
+    }
+    if (req.method === 'POST' && memoMatch) {
+      if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
+      const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
+      const memo = typeof body.memo === 'string' ? body.memo.slice(0, 2000) : '';
+      const fb = getFirebase();
+      await fb.db.collection('memos').doc(memoMatch[1]).set({ memo, updatedAt: Date.now() });
+      return json(res, 200, { memo });
+    }
+
     const photoMatch = /^\/api\/days\/(\d{4}-\d{2}-\d{2})\/photos$/.exec(pathname);
     if (req.method === 'GET' && photoMatch) {
       return json(res, 200, { photos: await listPhotos(photoMatch[1]) });
