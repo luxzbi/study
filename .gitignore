@@ -3,3 +3,4 @@ data/db.json
 public/uploads/
 *.log
 .env
+firebase-key.json
