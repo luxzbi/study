@@ -286,7 +286,7 @@ async function savePhotosToFirebase(date, files) {
     if (!IMAGE_TYPES.has(file.mime)) throw new Error('이미지 파일만 업로드할 수 있습니다.');
     const filename = cleanName(file.filename);
     const blob = await put(`uploads/${date}/${filename}`, file.data, {
-      access: 'public',
+      access: 'private',
       contentType: file.mime
     });
 
@@ -295,7 +295,7 @@ async function savePhotosToFirebase(date, files) {
       originalName: file.filename,
       filename,
       blobUrl: blob.url,
-      url: blob.url,
+      url: `/api/img?u=${encodeURIComponent(blob.url)}`,
       mime: file.mime,
       size: file.data.length,
       createdAt: Date.now()
@@ -397,6 +397,21 @@ async function route(req, res) {
       const ok = await deletePhoto((deleteMatch || firebaseDeleteMatch)[1]);
       if (!ok) return json(res, 404, { error: '사진을 찾을 수 없습니다.' });
       return json(res, 200, { ok: true });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/img') {
+      const blobUrl = url.searchParams.get('u');
+      if (!blobUrl) return text(res, 400, 'Missing url');
+      const imgRes = await fetch(blobUrl, {
+        headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
+      });
+      if (!imgRes.ok) return text(res, 404, 'Not found');
+      res.writeHead(200, {
+        'content-type': imgRes.headers.get('content-type') || 'image/jpeg',
+        'cache-control': 'public, max-age=31536000'
+      });
+      imgRes.body.pipe(res);
+      return;
     }
 
     if (req.method === 'GET') return serveStatic(req, res, pathname);
