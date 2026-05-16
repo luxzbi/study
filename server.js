@@ -406,11 +406,13 @@ async function route(req, res) {
         headers: { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
       });
       if (!imgRes.ok) return text(res, 404, 'Not found');
+      const buffer = Buffer.from(await imgRes.arrayBuffer());
       res.writeHead(200, {
         'content-type': imgRes.headers.get('content-type') || 'image/jpeg',
-        'cache-control': 'public, max-age=31536000'
+        'cache-control': 'public, max-age=31536000',
+        'content-length': buffer.length
       });
-      imgRes.body.pipe(res);
+      res.end(buffer);
       return;
     }
 
