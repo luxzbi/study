@@ -73,19 +73,16 @@ function initFirebase() {
   const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
     ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
     : require('./firebase-key.json');
-  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.project_id}.firebasestorage.app`;
 
   if (!admin.apps.length) {
     admin.initializeApp({
-      credential: admin.credential.cert(serviceAccount),
-      storageBucket
+      credential: admin.credential.cert(serviceAccount)
     });
   }
 
   return {
     admin,
-    db: admin.firestore(),
-    bucket: admin.storage().bucket()
+    db: admin.firestore()
   };
 }
 
@@ -281,29 +278,24 @@ async function savePhotos(date, files) {
 }
 
 async function savePhotosToFirebase(date, files) {
+  const { put } = require('@vercel/blob');
   const saved = [];
   const fb = getFirebase();
 
   for (const file of files) {
     if (!IMAGE_TYPES.has(file.mime)) throw new Error('이미지 파일만 업로드할 수 있습니다.');
     const filename = cleanName(file.filename);
-    const storagePath = `uploads/${date}/${filename}`;
-    const bucketFile = fb.bucket.file(storagePath);
-    await bucketFile.save(file.data, {
-      resumable: false,
-      metadata: { contentType: file.mime }
-    });
-    const [url] = await bucketFile.getSignedUrl({
-      action: 'read',
-      expires: '2500-01-01'
+    const blob = await put(`uploads/${date}/${filename}`, file.data, {
+      access: 'public',
+      contentType: file.mime
     });
 
     const doc = {
       date,
       originalName: file.filename,
       filename,
-      storagePath,
-      url,
+      blobUrl: blob.url,
+      url: blob.url,
       mime: file.mime,
       size: file.data.length,
       createdAt: Date.now()
@@ -323,8 +315,9 @@ async function deletePhoto(id) {
     if (!doc.exists) return false;
     const photo = doc.data();
     await ref.delete();
-    if (photo.storagePath) {
-      await fb.bucket.file(photo.storagePath).delete({ ignoreNotFound: true });
+    if (photo.blobUrl) {
+      const { del } = require('@vercel/blob');
+      await del(photo.blobUrl).catch(() => {});
     }
     return true;
   }
