@@ -295,7 +295,7 @@ async function savePhotosToFirebase(date, files) {
       originalName: file.filename,
       filename,
       blobUrl: blob.url,
-      url: `/api/img?u=${encodeURIComponent(blob.url)}`,
+      url: blob.url,
       mime: file.mime,
       size: file.data.length,
       createdAt: Date.now()
