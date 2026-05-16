@@ -286,7 +286,7 @@ async function savePhotosToFirebase(date, files) {
     if (!IMAGE_TYPES.has(file.mime)) throw new Error('이미지 파일만 업로드할 수 있습니다.');
     const filename = cleanName(file.filename);
     const blob = await put(`uploads/${date}/${filename}`, file.data, {
-      access: 'private',
+      access: 'public',
       contentType: file.mime
     });
 
