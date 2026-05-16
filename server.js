@@ -26,15 +26,7 @@ const PHOTO_COLLECTION = 'photos';
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 
-if (!ADMIN_ID || !ADMIN_PASSWORD || !TOKEN_SECRET) {
-  console.error('ADMIN_ID, ADMIN_PASSWORD, TOKEN_SECRET 값을 .env에 설정해 주세요.');
-  process.exit(1);
-}
-
 let firebase = null;
-if (USE_FIREBASE) {
-  firebase = initFirebase();
-}
 
 function loadEnv(filePath) {
   if (!fs.existsSync(filePath)) return;
@@ -95,6 +87,18 @@ function initFirebase() {
   };
 }
 
+function requireAuthConfig() {
+  if (!ADMIN_ID || !ADMIN_PASSWORD || !TOKEN_SECRET) {
+    throw new Error('ADMIN_ID, ADMIN_PASSWORD, TOKEN_SECRET 환경변수가 필요합니다.');
+  }
+}
+
+function getFirebase() {
+  if (!USE_FIREBASE) return null;
+  if (!firebase) firebase = initFirebase();
+  return firebase;
+}
+
 function json(res, status, payload) {
   const body = Buffer.from(JSON.stringify(payload));
   res.writeHead(status, {
@@ -130,12 +134,14 @@ function readBody(req) {
 }
 
 function signToken() {
+  requireAuthConfig();
   const payload = Buffer.from(JSON.stringify({ id: ADMIN_ID, exp: Date.now() + 1000 * 60 * 60 * 24 * 30 })).toString('base64url');
   const sig = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('base64url');
   return `${payload}.${sig}`;
 }
 
 function verifyToken(req) {
+  if (!ADMIN_ID || !TOKEN_SECRET) return false;
   const auth = req.headers.authorization || '';
   if (!auth.startsWith('Bearer ')) return false;
   const token = auth.slice(7);
@@ -205,7 +211,8 @@ function parseMultipart(buffer, contentType) {
 
 async function listDays() {
   if (USE_FIREBASE) {
-    const snap = await firebase.db.collection(PHOTO_COLLECTION).get();
+    const fb = getFirebase();
+    const snap = await fb.db.collection(PHOTO_COLLECTION).get();
     return groupDays(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
   }
 
@@ -232,7 +239,8 @@ function groupDays(photos) {
 
 async function listPhotos(date) {
   if (USE_FIREBASE) {
-    const snap = await firebase.db.collection(PHOTO_COLLECTION).where('date', '==', date).get();
+    const fb = getFirebase();
+    const snap = await fb.db.collection(PHOTO_COLLECTION).where('date', '==', date).get();
     return snap.docs
       .map((doc) => ({ id: doc.id, ...doc.data() }))
       .sort((a, b) => b.createdAt - a.createdAt);
@@ -272,12 +280,13 @@ async function savePhotos(date, files) {
 
 async function savePhotosToFirebase(date, files) {
   const saved = [];
+  const fb = getFirebase();
 
   for (const file of files) {
     if (!IMAGE_TYPES.has(file.mime)) throw new Error('이미지 파일만 업로드할 수 있습니다.');
     const filename = cleanName(file.filename);
     const storagePath = `uploads/${date}/${filename}`;
-    const bucketFile = firebase.bucket.file(storagePath);
+    const bucketFile = fb.bucket.file(storagePath);
     await bucketFile.save(file.data, {
       resumable: false,
       metadata: { contentType: file.mime }
@@ -297,7 +306,7 @@ async function savePhotosToFirebase(date, files) {
       size: file.data.length,
       createdAt: Date.now()
     };
-    const ref = await firebase.db.collection(PHOTO_COLLECTION).add(doc);
+    const ref = await fb.db.collection(PHOTO_COLLECTION).add(doc);
     saved.push({ id: ref.id, ...doc });
   }
 
@@ -306,13 +315,14 @@ async function savePhotosToFirebase(date, files) {
 
 async function deletePhoto(id) {
   if (USE_FIREBASE) {
-    const ref = firebase.db.collection(PHOTO_COLLECTION).doc(id);
+    const fb = getFirebase();
+    const ref = fb.db.collection(PHOTO_COLLECTION).doc(id);
     const doc = await ref.get();
     if (!doc.exists) return false;
     const photo = doc.data();
     await ref.delete();
     if (photo.storagePath) {
-      await firebase.bucket.file(photo.storagePath).delete({ ignoreNotFound: true });
+      await fb.bucket.file(photo.storagePath).delete({ ignoreNotFound: true });
     }
     return true;
   }
@@ -357,6 +367,7 @@ async function route(req, res) {
 
   try {
     if (req.method === 'POST' && pathname === '/api/login') {
+      requireAuthConfig();
       const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
       if ((body.username || ADMIN_ID) === ADMIN_ID && body.password === ADMIN_PASSWORD) {
         return json(res, 200, { token: signToken(), user: { username: ADMIN_ID } });
