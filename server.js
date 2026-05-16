@@ -23,8 +23,10 @@ const MAX_BODY = 60 * 1024 * 1024;
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif']);
 const PHOTO_COLLECTION = 'photos';
 
-fs.mkdirSync(DATA_DIR, { recursive: true });
-fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+if (!USE_FIREBASE) {
+  fs.mkdirSync(DATA_DIR, { recursive: true });
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
 
 let firebase = null;
 
