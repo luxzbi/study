@@ -18,8 +18,10 @@ loadEnv(path.join(ROOT, '.env'));
 const ADMIN_ID = process.env.ADMIN_ID;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const TOKEN_SECRET = process.env.TOKEN_SECRET;
+const USE_FIREBASE = process.env.USE_FIREBASE === 'true';
 const MAX_BODY = 60 * 1024 * 1024;
 const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif']);
+const PHOTO_COLLECTION = 'photos';
 
 fs.mkdirSync(DATA_DIR, { recursive: true });
 fs.mkdirSync(UPLOAD_DIR, { recursive: true });
@@ -27,6 +29,11 @@ fs.mkdirSync(UPLOAD_DIR, { recursive: true });
 if (!ADMIN_ID || !ADMIN_PASSWORD || !TOKEN_SECRET) {
   console.error('ADMIN_ID, ADMIN_PASSWORD, TOKEN_SECRET 값을 .env에 설정해 주세요.');
   process.exit(1);
+}
+
+let firebase = null;
+if (USE_FIREBASE) {
+  firebase = initFirebase();
 }
 
 function loadEnv(filePath) {
@@ -58,6 +65,34 @@ function readDb() {
 
 function writeDb(db) {
   fs.writeFileSync(DB_PATH, JSON.stringify(db, null, 2));
+}
+
+function initFirebase() {
+  let admin;
+  try {
+    admin = require('firebase-admin');
+  } catch {
+    console.error('Firebase 모드는 firebase-admin 설치가 필요합니다. npm install을 실행해 주세요.');
+    process.exit(1);
+  }
+
+  const serviceAccount = process.env.FIREBASE_SERVICE_ACCOUNT
+    ? JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT)
+    : require('./firebase-key.json');
+  const storageBucket = process.env.FIREBASE_STORAGE_BUCKET || `${serviceAccount.project_id}.firebasestorage.app`;
+
+  if (!admin.apps.length) {
+    admin.initializeApp({
+      credential: admin.credential.cert(serviceAccount),
+      storageBucket
+    });
+  }
+
+  return {
+    admin,
+    db: admin.firestore(),
+    bucket: admin.storage().bucket()
+  };
 }
 
 function json(res, status, payload) {
@@ -168,10 +203,19 @@ function parseMultipart(buffer, contentType) {
   return { fields, files };
 }
 
-function listDays() {
+async function listDays() {
+  if (USE_FIREBASE) {
+    const snap = await firebase.db.collection(PHOTO_COLLECTION).get();
+    return groupDays(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+  }
+
   const db = readDb();
+  return groupDays(db.photos);
+}
+
+function groupDays(photos) {
   const grouped = new Map();
-  for (const photo of db.photos) {
+  for (const photo of photos) {
     if (!grouped.has(photo.date)) grouped.set(photo.date, []);
     grouped.get(photo.date).push(photo);
   }
@@ -186,10 +230,100 @@ function listDays() {
     .sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
 }
 
-function listPhotos(date) {
+async function listPhotos(date) {
+  if (USE_FIREBASE) {
+    const snap = await firebase.db.collection(PHOTO_COLLECTION).where('date', '==', date).get();
+    return snap.docs
+      .map((doc) => ({ id: doc.id, ...doc.data() }))
+      .sort((a, b) => b.createdAt - a.createdAt);
+  }
+
   return readDb().photos
     .filter((photo) => photo.date === date)
     .sort((a, b) => b.createdAt - a.createdAt);
+}
+
+async function savePhotos(date, files) {
+  if (USE_FIREBASE) return savePhotosToFirebase(date, files);
+
+  const saved = [];
+  for (const file of files) {
+    if (!IMAGE_TYPES.has(file.mime)) throw new Error('이미지 파일만 업로드할 수 있습니다.');
+    const filename = cleanName(file.filename);
+    const relative = `/uploads/${filename}`;
+    fs.writeFileSync(path.join(UPLOAD_DIR, filename), file.data);
+    saved.push({
+      id: crypto.randomUUID(),
+      date,
+      originalName: file.filename,
+      filename,
+      url: relative,
+      mime: file.mime,
+      size: file.data.length,
+      createdAt: Date.now()
+    });
+  }
+
+  const db = readDb();
+  db.photos.push(...saved);
+  writeDb(db);
+  return listPhotos(date);
+}
+
+async function savePhotosToFirebase(date, files) {
+  const saved = [];
+
+  for (const file of files) {
+    if (!IMAGE_TYPES.has(file.mime)) throw new Error('이미지 파일만 업로드할 수 있습니다.');
+    const filename = cleanName(file.filename);
+    const storagePath = `uploads/${date}/${filename}`;
+    const bucketFile = firebase.bucket.file(storagePath);
+    await bucketFile.save(file.data, {
+      resumable: false,
+      metadata: { contentType: file.mime }
+    });
+    const [url] = await bucketFile.getSignedUrl({
+      action: 'read',
+      expires: '2500-01-01'
+    });
+
+    const doc = {
+      date,
+      originalName: file.filename,
+      filename,
+      storagePath,
+      url,
+      mime: file.mime,
+      size: file.data.length,
+      createdAt: Date.now()
+    };
+    const ref = await firebase.db.collection(PHOTO_COLLECTION).add(doc);
+    saved.push({ id: ref.id, ...doc });
+  }
+
+  return listPhotos(date);
+}
+
+async function deletePhoto(id) {
+  if (USE_FIREBASE) {
+    const ref = firebase.db.collection(PHOTO_COLLECTION).doc(id);
+    const doc = await ref.get();
+    if (!doc.exists) return false;
+    const photo = doc.data();
+    await ref.delete();
+    if (photo.storagePath) {
+      await firebase.bucket.file(photo.storagePath).delete({ ignoreNotFound: true });
+    }
+    return true;
+  }
+
+  const db = readDb();
+  const target = db.photos.find((photo) => photo.id === id);
+  if (!target) return false;
+  db.photos = db.photos.filter((photo) => photo.id !== target.id);
+  writeDb(db);
+  fs.rm(path.join(UPLOAD_DIR, target.filename), { force: true }, () => {});
+  return true;
 }
 
 function serveStatic(req, res, pathname) {
@@ -231,12 +365,12 @@ async function route(req, res) {
     }
 
     if (req.method === 'GET' && pathname === '/api/days') {
-      return json(res, 200, { days: listDays() });
+      return json(res, 200, { days: await listDays() });
     }
 
     const photoMatch = /^\/api\/days\/(\d{4}-\d{2}-\d{2})\/photos$/.exec(pathname);
     if (req.method === 'GET' && photoMatch) {
-      return json(res, 200, { photos: listPhotos(photoMatch[1]) });
+      return json(res, 200, { photos: await listPhotos(photoMatch[1]) });
     }
 
     if (req.method === 'POST' && pathname === '/api/photos') {
@@ -245,41 +379,17 @@ async function route(req, res) {
       const date = safeDate(parsed.fields.date);
       if (!date) return json(res, 400, { error: '날짜를 선택해 주세요.' });
 
-      const saved = [];
-      for (const file of parsed.files.filter((item) => item.field === 'photos')) {
-        if (!IMAGE_TYPES.has(file.mime)) return json(res, 400, { error: '이미지 파일만 업로드할 수 있습니다.' });
-        const filename = cleanName(file.filename);
-        const relative = `/uploads/${filename}`;
-        fs.writeFileSync(path.join(UPLOAD_DIR, filename), file.data);
-        saved.push({
-          id: crypto.randomUUID(),
-          date,
-          originalName: file.filename,
-          filename,
-          url: relative,
-          mime: file.mime,
-          size: file.data.length,
-          createdAt: Date.now()
-        });
-      }
-
-      if (saved.length === 0) return json(res, 400, { error: '업로드할 사진을 선택해 주세요.' });
-
-      const db = readDb();
-      db.photos.push(...saved);
-      writeDb(db);
-      return json(res, 201, { photos: listPhotos(date) });
+      const files = parsed.files.filter((item) => item.field === 'photos');
+      if (files.length === 0) return json(res, 400, { error: '업로드할 사진을 선택해 주세요.' });
+      return json(res, 201, { photos: await savePhotos(date, files) });
     }
 
     const deleteMatch = /^\/api\/photos\/([0-9a-f-]{36})$/.exec(pathname);
-    if (req.method === 'DELETE' && deleteMatch) {
+    const firebaseDeleteMatch = /^\/api\/photos\/([^/]+)$/.exec(pathname);
+    if (req.method === 'DELETE' && (deleteMatch || firebaseDeleteMatch)) {
       if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
-      const db = readDb();
-      const target = db.photos.find((photo) => photo.id === deleteMatch[1]);
-      if (!target) return json(res, 404, { error: '사진을 찾을 수 없습니다.' });
-      db.photos = db.photos.filter((photo) => photo.id !== target.id);
-      writeDb(db);
-      fs.rm(path.join(UPLOAD_DIR, target.filename), { force: true }, () => {});
+      const ok = await deletePhoto((deleteMatch || firebaseDeleteMatch)[1]);
+      if (!ok) return json(res, 404, { error: '사진을 찾을 수 없습니다.' });
       return json(res, 200, { ok: true });
     }
 
@@ -290,6 +400,10 @@ async function route(req, res) {
   }
 }
 
-http.createServer(route).listen(PORT, () => {
-  console.log(`Math board archive running at http://localhost:${PORT}`);
-});
+if (require.main === module) {
+  http.createServer(route).listen(PORT, () => {
+    console.log(`Math board archive running at http://localhost:${PORT}`);
+  });
+}
+
+module.exports = route;
