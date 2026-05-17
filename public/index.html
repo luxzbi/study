@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
-<title>수업 필기 사진함</title>
+<title>STUDYBOARD</title>
 <style>
 :root{
   --bg:#0a0a0a;
@@ -166,6 +166,15 @@ input[type="file"]{width:100%;color:var(--muted)}
 .login-card p{font-size:13px;color:var(--muted);margin-bottom:18px}
 .form{display:grid;gap:10px}
 .form .hbtn{width:100%;height:40px}
+.sched{display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:12px;font-weight:700;border:1px solid;cursor:pointer;user-select:none;transition:color .15s,border-color .15s,text-decoration .15s;vertical-align:middle;margin:1px 3px}
+.sched-0{color:var(--text);border-color:var(--line2)}
+.sched-1{color:var(--good);border-color:var(--good)}
+.sched-2{color:var(--muted2);border-color:var(--muted2);text-decoration:line-through}
+.cal-scheds{display:flex;flex-direction:column;gap:1px;margin-top:2px}
+.cal-sched{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.5;padding:0 2px;border-radius:2px}
+.cal-sched-0{color:var(--muted)}
+.cal-sched-1{color:var(--good)}
+.cal-sched-2{color:var(--muted2);text-decoration:line-through}
 .memo-section{border-bottom:1px solid var(--line);background:#0c0c0c}
 .memo-view{display:flex;align-items:flex-start;gap:8px;padding:12px 16px;min-height:44px}
 .memo-text{flex:1;font-size:13px;color:var(--text);line-height:1.6;white-space:pre-wrap;word-break:break-all}
@@ -195,7 +204,7 @@ input[type="file"]{width:100%;color:var(--muted)}
 </head>
 <body>
 <header id="header">
-  <div class="logo">MATH<span>BOARD</span></div>
+  <div class="logo">STUDY<span>BOARD</span></div>
   <div class="header-actions">
     <button class="hbtn" id="refreshBtn">새로고침</button>
     <button class="hbtn danger hidden" id="logoutBtn">로그아웃</button>
@@ -204,8 +213,8 @@ input[type="file"]{width:100%;color:var(--muted)}
 
 <main id="loginScreen" class="login-screen">
   <section class="login-card">
-    <h1>수업 필기 사진함</h1>
-    <p>학원 칠판 필기 사진을 날짜별로 정리해서 보는 관리자 화면입니다.</p>
+    <h1>STUDYBOARD</h1>
+    <p>칠판 필기 사진을 날짜별로 정리해서 보는 아카이브입니다.</p>
     <form class="form" id="loginForm">
       <input id="password" type="password" autocomplete="current-password" placeholder="비밀번호">
       <button class="hbtn primary" type="submit">로그인</button>
@@ -261,7 +270,7 @@ input[type="file"]{width:100%;color:var(--muted)}
           <button class="icon-btn" id="memoEditBtn" title="메모 수정" style="font-size:14px;flex:0 0 auto">✎</button>
         </div>
         <div class="memo-edit hidden" id="memoEditArea">
-          <textarea id="memoInput" placeholder="메모를 입력하세요. URL은 자동으로 링크됩니다."></textarea>
+          <textarea id="memoInput" placeholder="메모를 입력하세요.&#10;링크: &lt;url&gt;google.com/&#10;일정: &lt;d&gt;'시험'/ 또는 &lt;d&gt;수업준비/"></textarea>
           <div class="memo-actions">
             <button class="hbtn primary" id="memoSaveBtn" type="button">저장</button>
             <button class="hbtn" id="memoCancelBtn" type="button">취소</button>
@@ -311,12 +320,15 @@ input[type="file"]{width:100%;color:var(--muted)}
 const $ = (selector) => document.querySelector(selector);
 const state = {
   token: localStorage.getItem('mathArchiveToken') || '',
+  role: localStorage.getItem('mathArchiveRole') || '',
   days: [],
   selectedDate: '',
   calendarMonth: today().slice(0, 7),
   currentPhotos: [],
   galleryIndex: 0,
-  galleryZoom: 1
+  galleryZoom: 1,
+  schedStates: {},
+  calendarEvents: {}
 };
 
 function toast(message) {
@@ -387,9 +399,12 @@ function compressImage(file) {
 
 function showApp() {
   const loggedIn = Boolean(state.token);
+  const isAdmin = state.role === 'admin';
   $('#loginScreen').classList.toggle('hidden', loggedIn);
   $('#app').classList.toggle('hidden', !loggedIn);
   $('#logoutBtn').classList.toggle('hidden', !loggedIn);
+  $('#toggleUploadBtn').classList.toggle('hidden', !isAdmin);
+  $('#memoEditBtn').classList.toggle('hidden', !isAdmin);
   if (loggedIn) loadDays();
 }
 
@@ -441,18 +456,34 @@ function renderCalendar() {
       key === state.selectedDate ? 'selected' : '',
       key === today() ? 'today' : ''
     ].filter(Boolean).join(' ');
+    const evts = state.calendarEvents[key] || [];
+    const schedsHtml = evts.length
+      ? `<div class="cal-scheds">${evts.slice(0, 3).map((e) => `<span class="cal-sched cal-sched-${e.state}">${e.name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')}</span>`).join('')}</div>`
+      : '';
     btn.innerHTML = `
       <span class="cal-num">${d.getDate()}</span>
-      <span class="cal-meta">${count ? `<span class="cal-dot"></span>${count}장` : ''}</span>
+      <div><span class="cal-meta">${count ? `<span class="cal-dot"></span>${count}장` : ''}</span>${schedsHtml}</div>
     `;
     btn.addEventListener('click', () => selectDate(key, true, true));
     grid.appendChild(btn);
   }
 }
 
+async function loadCalendarEvents(month) {
+  try {
+    const data = await api(`/api/events?month=${month}`);
+    const prefix = month + '-';
+    for (const key of Object.keys(state.calendarEvents)) {
+      if (key.startsWith(prefix)) delete state.calendarEvents[key];
+    }
+    Object.assign(state.calendarEvents, data.events || {});
+  } catch {}
+}
+
 async function loadDays() {
   const data = await api('/api/days');
   state.days = data.days || [];
+  await loadCalendarEvents(state.calendarMonth);
   renderDays();
   renderCalendar();
   if (state.selectedDate) await loadPhotos(state.selectedDate);
@@ -494,14 +525,15 @@ async function loadPhotos(date) {
       <a href="${photo.url}" data-gallery-index="${index}"><img src="${photo.url}" alt="${photo.originalName}"></a>
       <div class="photo-info">
         <div class="photo-name">${photo.originalName}</div>
-        <button class="icon-btn" type="button" title="삭제" aria-label="삭제">×</button>
+        ${state.role === 'admin' ? `<button class="icon-btn" type="button" title="삭제" aria-label="삭제">×</button>` : ''}
       </div>
     `;
     item.querySelector('a').addEventListener('click', (event) => {
       event.preventDefault();
       openGallery(index);
     });
-    item.querySelector('button').addEventListener('click', async () => {
+    const delBtn = item.querySelector('button');
+    if (delBtn) delBtn.addEventListener('click', async () => {
       if (!confirm('이 사진을 삭제할까요?')) return;
       await api(`/api/photos/${photo.id}`, { method: 'DELETE' });
       toast('삭제했습니다.');
@@ -589,7 +621,9 @@ $('#loginForm').addEventListener('submit', async (event) => {
       body: JSON.stringify({ password: $('#password').value })
     });
     state.token = data.token;
+    state.role = data.role || 'admin';
     localStorage.setItem('mathArchiveToken', state.token);
+    localStorage.setItem('mathArchiveRole', state.role);
     toast('로그인했습니다.');
     showApp();
   } catch (error) {
@@ -599,7 +633,9 @@ $('#loginForm').addEventListener('submit', async (event) => {
 
 $('#logoutBtn').addEventListener('click', () => {
   state.token = '';
+  state.role = '';
   localStorage.removeItem('mathArchiveToken');
+  localStorage.removeItem('mathArchiveRole');
   showApp();
 });
 
@@ -609,17 +645,19 @@ $('#refreshBtn').addEventListener('click', () => {
 
 $('#todayBtn').addEventListener('click', () => selectDate(today(), true, true));
 
-$('#prevMonthBtn').addEventListener('click', () => {
+$('#prevMonthBtn').addEventListener('click', async () => {
   const [year, month] = state.calendarMonth.split('-').map(Number);
   const d = new Date(year, month - 2, 1);
   state.calendarMonth = dateKey(d.getFullYear(), d.getMonth() + 1, 1).slice(0, 7);
+  await loadCalendarEvents(state.calendarMonth);
   renderCalendar();
 });
 
-$('#nextMonthBtn').addEventListener('click', () => {
+$('#nextMonthBtn').addEventListener('click', async () => {
   const [year, month] = state.calendarMonth.split('-').map(Number);
   const d = new Date(year, month, 1);
   state.calendarMonth = dateKey(d.getFullYear(), d.getMonth() + 1, 1).slice(0, 7);
+  await loadCalendarEvents(state.calendarMonth);
   renderCalendar();
 });
 
@@ -676,29 +714,57 @@ $('#uploadForm').addEventListener('submit', async (event) => {
 
 function linkify(text) {
   const links = [];
-  // <url>표시텍스트/URL/ 또는 <url>URL/ 형식 추출 (http:// 없어도 인식)
-  const processed = text.replace(/<url>(?:([^\/\n]+)\/)?([^\s<\/][^\s<]*)\/[ \t]*/g, (_, label, raw) => {
+  const scheds = [];
+  // Extract <d>'일정'/ or <d>일정/ schedule tokens
+  let processed = text.replace(/<d>'([^'\n]+)'\/[ \t]*/g, (_, name) => {
+    scheds.push(name.trim());
+    return `\x02${scheds.length - 1}\x02`;
+  });
+  processed = processed.replace(/<d>([^'\/\n \t][^\/\n]*)\/[ \t]*/g, (_, name) => {
+    scheds.push(name.trim());
+    return `\x02${scheds.length - 1}\x02`;
+  });
+  // Extract <url> link tokens
+  processed = processed.replace(/<url>(?:([^\/\n]+)\/)?([^\s<\/][^\s<]*)\/[ \t]*/g, (_, label, raw) => {
     const url = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
     links.push({ display: label ? label.trim() : raw, url });
     return `\x00${links.length - 1}\x00`;
   });
-  // HTML 이스케이프 + 일반 http:// 자동 링크
+  // HTML escape + plain URL auto-link
   let result = processed
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/https?:\/\/[^\s<]*/g, u => `<a href="${u}" target="_blank" rel="noreferrer">${u}</a>`);
-  // 커스텀 링크 복원
+  // Restore <url> links
   result = result.replace(/\x00(\d+)\x00/g, (_, i) => {
     const { display, url } = links[+i];
     const d = display.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     return `<a href="${url.replace(/"/g,'&quot;')}" target="_blank" rel="noreferrer">${d}</a>`;
   });
+  // Restore <d> schedule chips
+  result = result.replace(/\x02(\d+)\x02/g, (_, i) => {
+    const name = scheds[+i];
+    const esc = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    return `<span class="sched sched-0" data-sched-name="${esc}">${esc}</span>`;
+  });
   return result;
+}
+
+async function loadSchedules(date) {
+  try {
+    const data = await api(`/api/days/${date}/schedules`);
+    state.schedStates[date] = data.states || {};
+    document.querySelectorAll('#memoText .sched').forEach((el) => {
+      const s = (state.schedStates[date] || {})[el.dataset.schedName] ?? 0;
+      el.className = `sched sched-${s}`;
+    });
+  } catch {}
 }
 
 async function loadMemo(date) {
   try {
     const data = await api(`/api/days/${date}/memo`);
     renderMemo(data.memo || '');
+    loadSchedules(date);
   } catch { renderMemo(''); }
 }
 
@@ -737,8 +803,35 @@ $('#memoSaveBtn').addEventListener('click', async () => {
       body: JSON.stringify({ memo })
     });
     renderMemo(memo);
+    await loadSchedules(state.selectedDate);
+    await loadCalendarEvents(state.calendarMonth);
+    renderCalendar();
     toast('메모를 저장했습니다.');
   } catch (error) { toast(error.message); }
+});
+
+$('#memoText').addEventListener('click', async (e) => {
+  const chip = e.target.closest('.sched');
+  if (!chip || !state.selectedDate || !state.token) return;
+  const name = chip.dataset.schedName;
+  const cur = (state.schedStates[state.selectedDate] || {})[name] ?? 0;
+  const next = (cur + 1) % 3;
+  if (!state.schedStates[state.selectedDate]) state.schedStates[state.selectedDate] = {};
+  state.schedStates[state.selectedDate][name] = next;
+  chip.className = `sched sched-${next}`;
+  // Update calendar
+  const evts = state.calendarEvents[state.selectedDate];
+  if (evts) {
+    const ev = evts.find((ev) => ev.name === name);
+    if (ev) { ev.state = next; renderCalendar(); }
+  }
+  try {
+    await api(`/api/days/${state.selectedDate}/schedules`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, state: next })
+    });
+  } catch (err) { toast(err.message); }
 });
 
 $('#uploadDate').value = today();

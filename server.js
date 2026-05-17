@@ -132,9 +132,11 @@ function readBody(req) {
   });
 }
 
-function signToken() {
+const VIEWER_PASSWORD = process.env.VIEWER_PASSWORD;
+
+function signToken(role = 'admin') {
   requireAuthConfig();
-  const payload = Buffer.from(JSON.stringify({ id: ADMIN_ID, exp: Date.now() + 1000 * 60 * 60 * 24 * 30 })).toString('base64url');
+  const payload = Buffer.from(JSON.stringify({ id: ADMIN_ID, role, exp: Date.now() + 1000 * 60 * 60 * 24 * 30 })).toString('base64url');
   const sig = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('base64url');
   return `${payload}.${sig}`;
 }
@@ -152,10 +154,38 @@ function verifyToken(req) {
 
   try {
     const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
-    return data.id === ADMIN_ID && data.exp > Date.now();
+    // viewer tokens are valid for reading but not for writes — verifyToken checks write permission
+    return data.id === ADMIN_ID && data.role === 'admin' && data.exp > Date.now();
   } catch {
     return false;
   }
+}
+
+function verifyAnyToken(req) {
+  if (!TOKEN_SECRET) return false;
+  const auth = req.headers.authorization || '';
+  if (!auth.startsWith('Bearer ')) return false;
+  const token = auth.slice(7);
+  const [payload, sig] = token.split('.');
+  if (!payload || !sig) return false;
+  const expected = crypto.createHmac('sha256', TOKEN_SECRET).update(payload).digest('base64url');
+  if (Buffer.byteLength(sig) !== Buffer.byteLength(expected)) return false;
+  if (!crypto.timingSafeEqual(Buffer.from(sig), Buffer.from(expected))) return false;
+  try {
+    const data = JSON.parse(Buffer.from(payload, 'base64url').toString('utf8'));
+    return data.exp > Date.now();
+  } catch { return false; }
+}
+
+function extractScheduleNames(memo) {
+  const names = [];
+  const re = /<d>(?:'([^'\n]+)'|([^'\/\n \t][^\/\n]*))\/[ \t]*/g;
+  let m;
+  while ((m = re.exec(memo)) !== null) {
+    const name = (m[1] || m[2] || '').trim();
+    if (name) names.push(name);
+  }
+  return [...new Set(names)];
 }
 
 function safeDate(value) {
@@ -365,9 +395,12 @@ async function route(req, res) {
       requireAuthConfig();
       const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
       if ((body.username || ADMIN_ID) === ADMIN_ID && body.password === ADMIN_PASSWORD) {
-        return json(res, 200, { token: signToken(), user: { username: ADMIN_ID } });
+        return json(res, 200, { token: signToken('admin'), role: 'admin' });
       }
-      return json(res, 401, { error: '아이디 또는 비밀번호가 맞지 않습니다.' });
+      if (VIEWER_PASSWORD && body.password === VIEWER_PASSWORD) {
+        return json(res, 200, { token: signToken('viewer'), role: 'viewer' });
+      }
+      return json(res, 401, { error: '비밀번호가 맞지 않습니다.' });
     }
 
     if (req.method === 'GET' && pathname === '/api/days') {
@@ -386,7 +419,62 @@ async function route(req, res) {
       const memo = typeof body.memo === 'string' ? body.memo.slice(0, 2000) : '';
       const fb = getFirebase();
       await fb.db.collection('memos').doc(memoMatch[1]).set({ memo, updatedAt: Date.now() });
+      // Sync schedule names extracted from memo
+      const names = extractScheduleNames(memo);
+      const schedRef = fb.db.collection('schedules').doc(memoMatch[1]);
+      const schedSnap = await schedRef.get();
+      const existingStates = schedSnap.exists ? (schedSnap.data().states || {}) : {};
+      const filteredStates = {};
+      for (const name of names) {
+        if (name in existingStates) filteredStates[name] = existingStates[name];
+      }
+      if (names.length > 0) {
+        await schedRef.set({ names, states: filteredStates, updatedAt: Date.now() });
+      } else if (schedSnap.exists) {
+        await schedRef.delete();
+      }
       return json(res, 200, { memo });
+    }
+
+    const schedMatch = /^\/api\/days\/(\d{4}-\d{2}-\d{2})\/schedules$/.exec(pathname);
+    if (req.method === 'GET' && schedMatch) {
+      const fb = getFirebase();
+      const doc = await fb.db.collection('schedules').doc(schedMatch[1]).get();
+      const data = doc.exists ? doc.data() : {};
+      return json(res, 200, { names: data.names || [], states: data.states || {} });
+    }
+    if (req.method === 'POST' && schedMatch) {
+      if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
+      const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
+      const name = typeof body.name === 'string' ? body.name.slice(0, 200) : '';
+      const schedState = Number(body.state);
+      if (!name || ![0, 1, 2].includes(schedState)) return json(res, 400, { error: '잘못된 요청' });
+      const fb = getFirebase();
+      const ref = fb.db.collection('schedules').doc(schedMatch[1]);
+      const snap = await ref.get();
+      const existing = snap.exists ? snap.data() : { names: [], states: {} };
+      const states = { ...(existing.states || {}), [name]: schedState };
+      await ref.set({ ...existing, states }, { merge: true });
+      return json(res, 200, { state: schedState });
+    }
+
+    if (req.method === 'GET' && pathname === '/api/events') {
+      const month = url.searchParams.get('month');
+      if (!month || !/^\d{4}-\d{2}$/.test(month)) return json(res, 400, { error: '잘못된 월' });
+      const fb = getFirebase();
+      const snap = await fb.db.collection('schedules')
+        .where(fb.admin.firestore.FieldPath.documentId(), '>=', `${month}-01`)
+        .where(fb.admin.firestore.FieldPath.documentId(), '<=', `${month}-31`)
+        .get();
+      const events = {};
+      snap.forEach((doc) => {
+        const data = doc.data();
+        const names = data.names || [];
+        if (names.length > 0) {
+          events[doc.id] = names.map((n) => ({ name: n, state: (data.states || {})[n] ?? 0 }));
+        }
+      });
+      return json(res, 200, { events });
     }
 
     const photoMatch = /^\/api\/days\/(\d{4}-\d{2}-\d{2})\/photos$/.exec(pathname);
