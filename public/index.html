@@ -284,7 +284,7 @@ input[type="file"]{width:100%;color:var(--muted)}
       <div class="memo-text empty" id="undatedText">항목 없음 (✎ 클릭하여 추가)</div>
     </div>
     <div class="memo-edit hidden" id="undatedEditArea">
-      <textarea id="undatedInput" placeholder="날짜가 정해지지 않은 일정이나 수행평가를 입력하세요.&#10;일정 태그: &lt;d&gt;'수행평가'/&#10;링크: &lt;url&gt;google.com/"></textarea>
+      <textarea id="undatedInput" placeholder="날짜가 정해지지 않은 일정이나 수행평가를 입력하세요.&#10;일정 태그: &lt;d&gt;'수행평가'/&#10;링크: &lt;u&gt;google.com/"></textarea>
       <div class="memo-actions">
         <button class="hbtn primary" id="undatedSaveBtn" type="button">저장</button>
         <button class="hbtn" id="undatedCancelBtn" type="button">취소</button>
@@ -316,7 +316,7 @@ input[type="file"]{width:100%;color:var(--muted)}
           <button class="icon-btn" id="memoEditBtn" title="메모 수정" style="font-size:14px;flex:0 0 auto">✎</button>
         </div>
         <div class="memo-edit hidden" id="memoEditArea">
-          <textarea id="memoInput" placeholder="메모를 입력하세요.&#10;링크: &lt;url&gt;google.com/&#10;일정: &lt;d&gt;'시험'/ 또는 &lt;d&gt;수업준비/"></textarea>
+          <textarea id="memoInput" placeholder="메모를 입력하세요.&#10;링크: &lt;u&gt;google.com/&#10;일정: &lt;d&gt;'시험'/ 또는 &lt;d&gt;수업준비/"></textarea>
           <div class="memo-actions">
             <button class="hbtn primary" id="memoSaveBtn" type="button">저장</button>
             <button class="hbtn" id="memoCancelBtn" type="button">취소</button>
@@ -833,7 +833,7 @@ function linkify(text) {
     return `\x02${scheds.length - 1}\x02`;
   });
   // Extract <url> link tokens
-  processed = processed.replace(/<url>(?:([^\/\n]+)\/)?([^\s<\/][^\s<]*)\/[ \t]*/g, (_, label, raw) => {
+  processed = processed.replace(/<u>(?:([^\/\n]+)\/)?([^\s<\/][^\s<]*)\/[ \t]*/g, (_, label, raw) => {
     const url = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
     links.push({ display: label ? label.trim() : raw, url });
     return `\x00${links.length - 1}\x00`;
