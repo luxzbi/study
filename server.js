@@ -486,6 +486,32 @@ async function route(req, res) {
       return json(res, 200, { events });
     }
 
+    if (req.method === 'GET' && pathname === '/api/study') {
+      const week = url.searchParams.get('week');
+      if (!week || !/^\d{4}-\d{2}-\d{2}$/.test(week)) return json(res, 400, { error: '잘못된 주' });
+      const fb = getFirebase();
+      const doc = await fb.db.collection('study_weeks').doc(week).get();
+      return json(res, 200, { data: doc.exists ? doc.data() : {} });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/study') {
+      if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
+      const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
+      const week = typeof body.week === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(body.week) ? body.week : '';
+      const day = ['mon','tue','wed','thu','fri'].includes(body.day) ? body.day : '';
+      const slot = typeof body.slot === 'string' ? body.slot.slice(0, 100) : '';
+      const text = typeof body.text === 'string' ? body.text.slice(0, 1000) : '';
+      if (!week || !day || !slot) return json(res, 400, { error: '잘못된 요청' });
+      const fb = getFirebase();
+      const ref = fb.db.collection('study_weeks').doc(week);
+      try {
+        await ref.update({ [`${day}.${slot}`]: text });
+      } catch {
+        await ref.set({ [day]: { [slot]: text } });
+      }
+      return json(res, 200, { ok: true });
+    }
+
     const photoMatch = /^\/api\/days\/(\d{4}-\d{2}-\d{2})\/photos$/.exec(pathname);
     if (req.method === 'GET' && photoMatch) {
       return json(res, 200, { photos: await listPhotos(photoMatch[1]) });
