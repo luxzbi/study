@@ -179,7 +179,7 @@ function verifyAnyToken(req) {
 
 function extractScheduleNames(memo) {
   const names = [];
-  const re = /<d>(?:'([^'\n]+)'|([^'\/\n \t][^\/\n]*))\/[ \t]*/g;
+  const re = /<d>[ \t]*(?:'([^'\n]+)'|([^\/\n]+?))[ \t]*\//g;
   let m;
   while ((m = re.exec(memo)) !== null) {
     const name = (m[1] || m[2] || '').trim();
@@ -462,12 +462,11 @@ async function route(req, res) {
       const month = url.searchParams.get('month');
       if (!month || !/^\d{4}-\d{2}$/.test(month)) return json(res, 400, { error: '잘못된 월' });
       const fb = getFirebase();
-      const snap = await fb.db.collection('schedules')
-        .where(fb.admin.firestore.FieldPath.documentId(), '>=', `${month}-01`)
-        .where(fb.admin.firestore.FieldPath.documentId(), '<=', `${month}-31`)
-        .get();
+      const snap = await fb.db.collection('schedules').get();
       const events = {};
+      const prefix = month + '-';
       snap.forEach((doc) => {
+        if (!doc.id.startsWith(prefix)) return;
         const data = doc.data();
         const names = data.names || [];
         if (names.length > 0) {

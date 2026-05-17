@@ -167,12 +167,12 @@ input[type="file"]{width:100%;color:var(--muted)}
 .form{display:grid;gap:10px}
 .form .hbtn{width:100%;height:40px}
 .sched{display:inline-flex;align-items:center;padding:1px 7px;border-radius:4px;font-size:12px;font-weight:700;border:1px solid;cursor:pointer;user-select:none;transition:color .15s,border-color .15s,text-decoration .15s;vertical-align:middle;margin:1px 3px}
-.sched-0{color:var(--text);border-color:var(--line2)}
+.sched-0{color:#fff;border-color:rgba(255,255,255,.25)}
 .sched-1{color:var(--good);border-color:var(--good)}
 .sched-2{color:var(--muted2);border-color:var(--muted2);text-decoration:line-through}
 .cal-scheds{display:flex;flex-direction:column;gap:1px;margin-top:2px}
 .cal-sched{font-size:10px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;line-height:1.5;padding:0 2px;border-radius:2px}
-.cal-sched-0{color:var(--muted)}
+.cal-sched-0{color:var(--text)}
 .cal-sched-1{color:var(--good)}
 .cal-sched-2{color:var(--muted2);text-decoration:line-through}
 .memo-section{border-bottom:1px solid var(--line);background:#0c0c0c}
@@ -715,13 +715,11 @@ $('#uploadForm').addEventListener('submit', async (event) => {
 function linkify(text) {
   const links = [];
   const scheds = [];
-  // Extract <d>'일정'/ or <d>일정/ schedule tokens
-  let processed = text.replace(/<d>'([^'\n]+)'\/[ \t]*/g, (_, name) => {
-    scheds.push(name.trim());
-    return `\x02${scheds.length - 1}\x02`;
-  });
-  processed = processed.replace(/<d>([^'\/\n \t][^\/\n]*)\/[ \t]*/g, (_, name) => {
-    scheds.push(name.trim());
+  // Extract <d>'일정'/ or <d>일정/ schedule tokens (quoted or unquoted, optional spaces)
+  let processed = text.replace(/<d>[ \t]*(?:'([^'\n]+)'|([^\/\n]+?))[ \t]*\/[ \t]*/g, (match, quoted, plain) => {
+    const name = (quoted || plain || '').trim();
+    if (!name) return match;
+    scheds.push(name);
     return `\x02${scheds.length - 1}\x02`;
   });
   // Extract <url> link tokens
