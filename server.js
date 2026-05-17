@@ -241,43 +241,60 @@ function parseMultipart(buffer, contentType) {
 async function listDays() {
   if (USE_FIREBASE) {
     const fb = getFirebase();
-    const snap = await fb.db.collection(PHOTO_COLLECTION).get();
-    return groupDays(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+    const [photoSnap, memoSnap] = await Promise.all([
+      fb.db.collection(PHOTO_COLLECTION).get(),
+      fb.db.collection('memos').get()
+    ]);
+    const photos = photoSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+    const memoDates = new Set(memoSnap.docs.map((doc) => doc.id));
+    return groupDays(photos, memoDates);
   }
 
   const db = readDb();
-  return groupDays(db.photos);
+  return groupDays(db.photos, new Set());
 }
 
-function groupDays(photos) {
+function groupDays(photos, memoDates = new Set()) {
   const grouped = new Map();
   for (const photo of photos) {
     if (!grouped.has(photo.date)) grouped.set(photo.date, []);
     grouped.get(photo.date).push(photo);
+  }
+  // Include memo-only dates (no photos)
+  for (const date of memoDates) {
+    if (!grouped.has(date)) grouped.set(date, []);
   }
 
   return [...grouped.entries()]
     .map(([date, photos]) => ({
       date,
       count: photos.length,
-      cover: photos.sort((a, b) => b.createdAt - a.createdAt)[0]?.url || '',
-      updatedAt: Math.max(...photos.map((photo) => photo.createdAt))
+      cover: photos.length ? photos.sort((a, b) => b.createdAt - a.createdAt)[0]?.url || '' : '',
+      updatedAt: photos.length ? Math.max(...photos.map((photo) => photo.createdAt)) : 0
     }))
     .sort((a, b) => b.date.localeCompare(a.date) || b.updatedAt - a.updatedAt);
+}
+
+function sortPhotos(photos) {
+  const hasOrder = photos.some((p) => p.order !== undefined);
+  if (hasOrder) {
+    return photos.sort((a, b) => {
+      const aO = a.order !== undefined ? a.order : 999999999;
+      const bO = b.order !== undefined ? b.order : 999999999;
+      return aO - bO;
+    });
+  }
+  return photos.sort((a, b) => b.createdAt - a.createdAt);
 }
 
 async function listPhotos(date) {
   if (USE_FIREBASE) {
     const fb = getFirebase();
     const snap = await fb.db.collection(PHOTO_COLLECTION).where('date', '==', date).get();
-    return snap.docs
-      .map((doc) => ({ id: doc.id, ...doc.data() }))
-      .sort((a, b) => b.createdAt - a.createdAt);
+    return sortPhotos(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
   }
 
-  return readDb().photos
-    .filter((photo) => photo.date === date)
-    .sort((a, b) => b.createdAt - a.createdAt);
+  return sortPhotos(readDb().photos.filter((photo) => photo.date === date));
 }
 
 async function savePhotos(date, files) {
@@ -540,6 +557,28 @@ async function route(req, res) {
       const files = parsed.files.filter((item) => item.field === 'photos');
       if (files.length === 0) return json(res, 400, { error: '업로드할 사진을 선택해 주세요.' });
       return json(res, 201, { photos: await savePhotos(date, files) });
+    }
+
+    const moveMatch = /^\/api\/photos\/([^/]+)\/move$/.exec(pathname);
+    if (req.method === 'POST' && moveMatch) {
+      if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
+      const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
+      const direction = body.direction;
+      if (direction !== 'up' && direction !== 'down') return json(res, 400, { error: '잘못된 방향' });
+      const fb = getFirebase();
+      const photoDoc = await fb.db.collection(PHOTO_COLLECTION).doc(moveMatch[1]).get();
+      if (!photoDoc.exists) return json(res, 404, { error: '사진을 찾을 수 없습니다.' });
+      const date = photoDoc.data().date;
+      const snap = await fb.db.collection(PHOTO_COLLECTION).where('date', '==', date).get();
+      const photos = sortPhotos(snap.docs.map((doc) => ({ id: doc.id, ...doc.data() })));
+      const idx = photos.findIndex((p) => p.id === moveMatch[1]);
+      const swapIdx = direction === 'up' ? idx - 1 : idx + 1;
+      if (swapIdx < 0 || swapIdx >= photos.length) return json(res, 400, { error: '이미 끝입니다.' });
+      [photos[idx], photos[swapIdx]] = [photos[swapIdx], photos[idx]];
+      const batch = fb.db.batch();
+      photos.forEach((p, i) => batch.update(fb.db.collection(PHOTO_COLLECTION).doc(p.id), { order: i * 1000 }));
+      await batch.commit();
+      return json(res, 200, { ok: true });
     }
 
     const deleteMatch = /^\/api\/photos\/([0-9a-f-]{36})$/.exec(pathname);

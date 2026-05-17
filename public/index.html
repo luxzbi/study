@@ -191,6 +191,10 @@ input[type="file"]{width:100%;color:var(--muted)}
   color:var(--text);font-size:13px;opacity:0;pointer-events:none;transition:.2s
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.photo-ctx{position:fixed;z-index:200;background:#1e1e1e;border:1px solid var(--line2);border-radius:8px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.65);min-width:56px}
+.photo-ctx-btn{padding:11px 22px;font-size:22px;color:var(--text);cursor:pointer;border:none;background:none;line-height:1;font-weight:700}
+.photo-ctx-btn:hover:not(:disabled){background:var(--bg3)}
+.photo-ctx-btn:disabled{color:var(--muted2);cursor:default}
 .hidden{display:none!important}
 .page-tabs{display:flex;border-bottom:1px solid var(--line);background:rgba(10,10,10,.95);backdrop-filter:blur(12px);position:sticky;top:54px;z-index:19}
 .page-tab{padding:0 20px;height:40px;font-size:13px;font-weight:700;color:var(--muted);border-bottom:2px solid transparent;white-space:nowrap}
@@ -354,6 +358,11 @@ input[type="file"]{width:100%;color:var(--muted)}
     <table class="study-table" id="studyTable"></table>
   </div>
 </main>
+
+<div class="photo-ctx hidden" id="photoCtx">
+  <button class="photo-ctx-btn" id="photoCtxUp" title="위로">↑</button>
+  <button class="photo-ctx-btn" id="photoCtxDown" title="아래로">↓</button>
+</div>
 
 <div class="toast" id="toast"></div>
 
@@ -624,6 +633,23 @@ async function loadPhotos(date) {
       await loadDays();
       await loadPhotos(state.selectedDate);
     });
+    if (state.role === 'admin') {
+      item.addEventListener('contextmenu', (e) => {
+        e.preventDefault();
+        ctxPhotoId = photo.id;
+        $('#photoCtxUp').disabled = index === 0;
+        $('#photoCtxDown').disabled = index === photos.length - 1;
+        const ctx = $('#photoCtx');
+        ctx.style.left = e.clientX + 'px';
+        ctx.style.top = e.clientY + 'px';
+        ctx.classList.remove('hidden');
+        setTimeout(() => {
+          const r = ctx.getBoundingClientRect();
+          if (r.right > window.innerWidth - 6) ctx.style.left = (e.clientX - r.width) + 'px';
+          if (r.bottom > window.innerHeight - 6) ctx.style.top = (e.clientY - r.height) + 'px';
+        }, 0);
+      });
+    }
     grid.appendChild(item);
   }
 
@@ -915,6 +941,31 @@ $('#memoText').addEventListener('click', async (e) => {
     });
   } catch (err) { toast(err.message); }
 });
+
+// ── 사진 순서 변경 컨텍스트 메뉴 ─────────────
+let ctxPhotoId = null;
+document.addEventListener('click', (e) => {
+  if (!e.target.closest('#photoCtx')) $('#photoCtx').classList.add('hidden');
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') $('#photoCtx').classList.add('hidden');
+});
+
+async function movePhoto(direction) {
+  $('#photoCtx').classList.add('hidden');
+  if (!ctxPhotoId) return;
+  try {
+    await api(`/api/photos/${ctxPhotoId}/move`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ direction })
+    });
+    await loadPhotos(state.selectedDate);
+  } catch (err) { toast(err.message); }
+}
+$('#photoCtxUp').addEventListener('click', () => movePhoto('up'));
+$('#photoCtxDown').addEventListener('click', () => movePhoto('down'));
+// ─────────────────────────────────────────────
 
 // ── 미정 일정 / 수행평가 ─────────────────────
 async function loadUndated() {
