@@ -825,24 +825,30 @@ $('#uploadForm').addEventListener('submit', async (event) => {
 function linkify(text) {
   const links = [];
   const scheds = [];
-  // Extract <d>'일정'/ or <d>일정/ schedule tokens (quoted or unquoted, optional spaces)
+  const bolds = [];
+  // Extract <d> schedule tokens
   let processed = text.replace(/<d>[ \t]*(?:'([^'\n]+)'|([^\/\n]+?))[ \t]*\/[ \t]*/g, (match, quoted, plain) => {
     const name = (quoted || plain || '').trim();
     if (!name) return match;
     scheds.push(name);
     return `\x02${scheds.length - 1}\x02`;
   });
-  // Extract <url> link tokens
+  // Extract <u> link tokens
   processed = processed.replace(/<u>(?:([^\/\n]+)\/)?([^\s<\/][^\s<]*)\/[ \t]*/g, (_, label, raw) => {
     const url = /^https?:\/\//i.test(raw) ? raw : 'https://' + raw;
     links.push({ display: label ? label.trim() : raw, url });
     return `\x00${links.length - 1}\x00`;
   });
+  // Extract <굵게> bold tokens
+  processed = processed.replace(/<([^<>\n]+)>/g, (_, content) => {
+    bolds.push(content);
+    return `\x03${bolds.length - 1}\x03`;
+  });
   // HTML escape + plain URL auto-link
   let result = processed
     .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
     .replace(/https?:\/\/[^\s<]*/g, u => `<a href="${u}" target="_blank" rel="noreferrer">${u}</a>`);
-  // Restore <url> links
+  // Restore <u> links
   result = result.replace(/\x00(\d+)\x00/g, (_, i) => {
     const { display, url } = links[+i];
     const d = display.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
@@ -853,6 +859,11 @@ function linkify(text) {
     const name = scheds[+i];
     const esc = name.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
     return `<span class="sched sched-0" data-sched-name="${esc}">${esc}</span>`;
+  });
+  // Restore bold
+  result = result.replace(/\x03(\d+)\x03/g, (_, i) => {
+    const esc = bolds[+i].replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+    return `<strong>${esc}</strong>`;
   });
   return result;
 }
