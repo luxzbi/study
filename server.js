@@ -486,6 +486,20 @@ async function route(req, res) {
       return json(res, 200, { events });
     }
 
+    if (req.method === 'GET' && pathname === '/api/notes/undated') {
+      const fb = getFirebase();
+      const doc = await fb.db.collection('notes').doc('undated').get();
+      return json(res, 200, { content: doc.exists ? (doc.data().content || '') : '' });
+    }
+    if (req.method === 'POST' && pathname === '/api/notes/undated') {
+      if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
+      const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
+      const content = typeof body.content === 'string' ? body.content.slice(0, 5000) : '';
+      const fb = getFirebase();
+      await fb.db.collection('notes').doc('undated').set({ content, updatedAt: Date.now() });
+      return json(res, 200, { content });
+    }
+
     if (req.method === 'GET' && pathname === '/api/study') {
       const week = url.searchParams.get('week');
       if (!week || !/^\d{4}-\d{2}-\d{2}$/.test(week)) return json(res, 400, { error: '잘못된 주' });

@@ -46,6 +46,7 @@ img{display:block;max-width:100%}
 .title h1{font-size:1.8rem;line-height:1.25;color:var(--white);letter-spacing:0}
 .title p{margin-top:8px;color:var(--muted);font-size:14px}
 .calendar-panel{margin-bottom:22px}
+.undated-panel{margin-bottom:22px}
 .calendar-nav{display:flex;align-items:center;gap:8px}
 .calendar-title{min-width:112px;text-align:center;font-size:14px;font-weight:850;color:var(--white)}
 .calendar-week,.calendar-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
@@ -220,7 +221,10 @@ input[type="file"]{width:100%;color:var(--muted)}
 </head>
 <body>
 <header id="header">
-  <div class="logo">STUDY<span>BOARD</span></div>
+  <div style="display:flex;align-items:center;gap:16px">
+    <div class="logo">STUDY<span>BOARD</span></div>
+    <span id="headerClock" style="font-size:13px;font-weight:700;color:var(--muted);letter-spacing:.04em;white-space:nowrap"></span>
+  </div>
   <div class="header-actions">
     <button class="hbtn" id="refreshBtn">새로고침</button>
     <button class="hbtn danger hidden" id="logoutBtn">로그아웃</button>
@@ -265,6 +269,23 @@ input[type="file"]{width:100%;color:var(--muted)}
       <span>일</span><span>월</span><span>화</span><span>수</span><span>목</span><span>금</span><span>토</span>
     </div>
     <div class="calendar-grid" id="calendarGrid"></div>
+  </section>
+
+  <section class="panel undated-panel" id="undatedPanel">
+    <div class="panel-head">
+      <strong>미정 일정 · 수행평가</strong>
+      <button class="icon-btn hidden" id="undatedEditBtn" title="수정" style="font-size:14px;flex:0 0 auto">✎</button>
+    </div>
+    <div class="memo-view" id="undatedView">
+      <div class="memo-text empty" id="undatedText">항목 없음 (✎ 클릭하여 추가)</div>
+    </div>
+    <div class="memo-edit hidden" id="undatedEditArea">
+      <textarea id="undatedInput" placeholder="날짜가 정해지지 않은 일정이나 수행평가를 입력하세요.&#10;일정 태그: &lt;d&gt;'수행평가'/&#10;링크: &lt;url&gt;google.com/"></textarea>
+      <div class="memo-actions">
+        <button class="hbtn primary" id="undatedSaveBtn" type="button">저장</button>
+        <button class="hbtn" id="undatedCancelBtn" type="button">취소</button>
+      </div>
+    </div>
   </section>
 
   <section class="layout">
@@ -467,7 +488,8 @@ function showApp() {
   $('#logoutBtn').classList.toggle('hidden', !loggedIn);
   $('#toggleUploadBtn').classList.toggle('hidden', !isAdmin);
   $('#memoEditBtn').classList.toggle('hidden', !isAdmin);
-  if (loggedIn) loadDays();
+  $('#undatedEditBtn').classList.toggle('hidden', !isAdmin);
+  if (loggedIn) { loadDays(); loadUndated(); }
 }
 
 function renderDays() {
@@ -894,6 +916,51 @@ $('#memoText').addEventListener('click', async (e) => {
   } catch (err) { toast(err.message); }
 });
 
+// ── 미정 일정 / 수행평가 ─────────────────────
+async function loadUndated() {
+  try {
+    const data = await api('/api/notes/undated');
+    renderUndated(data.content || '');
+  } catch { renderUndated(''); }
+}
+
+function renderUndated(content) {
+  const el = $('#undatedText');
+  if (content.trim()) {
+    el.classList.remove('empty');
+    el.innerHTML = linkify(content);
+  } else {
+    el.classList.add('empty');
+    el.textContent = '항목 없음 (✎ 클릭하여 추가)';
+  }
+  $('#undatedInput').value = content;
+  $('#undatedEditArea').classList.add('hidden');
+  $('#undatedView').classList.remove('hidden');
+}
+
+$('#undatedEditBtn').addEventListener('click', () => {
+  $('#undatedView').classList.add('hidden');
+  $('#undatedEditArea').classList.remove('hidden');
+  $('#undatedInput').focus();
+});
+$('#undatedCancelBtn').addEventListener('click', () => {
+  $('#undatedEditArea').classList.add('hidden');
+  $('#undatedView').classList.remove('hidden');
+});
+$('#undatedSaveBtn').addEventListener('click', async () => {
+  const content = $('#undatedInput').value;
+  try {
+    await api('/api/notes/undated', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ content })
+    });
+    renderUndated(content);
+    toast('저장했습니다.');
+  } catch (err) { toast(err.message); }
+});
+// ─────────────────────────────────────────────
+
 // ── 자습관리 ──────────────────────────────────
 const STUDY_SLOTS = ['아침시간', '점심시간', 'CIP 1차', '석식시간', 'CIP 2-1차', 'CIP 2-2차', 'CIP 3차'];
 const STUDY_DAYS = [
@@ -998,6 +1065,18 @@ $('#studyNextBtn').addEventListener('click', () => {
 });
 $('#studyTodayBtn').addEventListener('click', () => loadStudyWeek(getMondayOfWeek(today())));
 // ─────────────────────────────────────────────
+
+// 현재시간 표시
+(function tickClock() {
+  const el = $('#headerClock');
+  const now = new Date();
+  const hh = String(now.getHours()).padStart(2, '0');
+  const mm = String(now.getMinutes()).padStart(2, '0');
+  const ss = String(now.getSeconds()).padStart(2, '0');
+  const days = ['일', '월', '화', '수', '목', '금', '토'];
+  el.textContent = `${now.getMonth()+1}/${now.getDate()}(${days[now.getDay()]}) ${hh}:${mm}:${ss}`;
+  setTimeout(tickClock, 1000);
+})();
 
 $('#uploadDate').value = today();
 showApp();
