@@ -592,7 +592,12 @@ async function selectDate(date, openUpload, scrollToViewer = false) {
   renderCalendar();
   await loadPhotos(date);
   if (scrollToViewer) {
-    document.querySelector('.viewer').scrollIntoView({ behavior: 'smooth', block: 'start' });
+    const target = document.querySelector('.viewer .panel-head');
+    if (target) {
+      const offset = 54 + 40 + 8; // header + page-tabs + margin
+      const top = target.getBoundingClientRect().top + window.scrollY - offset;
+      window.scrollTo({ top, behavior: 'smooth' });
+    }
   }
 }
 
