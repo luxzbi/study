@@ -439,9 +439,13 @@ async function route(req, res) {
     const schedMatch = /^\/api\/days\/(\d{4}-\d{2}-\d{2})\/schedules$/.exec(pathname);
     if (req.method === 'GET' && schedMatch) {
       const fb = getFirebase();
-      const doc = await fb.db.collection('schedules').doc(schedMatch[1]).get();
-      const data = doc.exists ? doc.data() : {};
-      return json(res, 200, { names: data.names || [], states: data.states || {} });
+      const [memoDoc, schedDoc] = await Promise.all([
+        fb.db.collection('memos').doc(schedMatch[1]).get(),
+        fb.db.collection('schedules').doc(schedMatch[1]).get()
+      ]);
+      const names = extractScheduleNames(memoDoc.exists ? (memoDoc.data().memo || '') : '');
+      const states = schedDoc.exists ? (schedDoc.data().states || {}) : {};
+      return json(res, 200, { names, states });
     }
     if (req.method === 'POST' && schedMatch) {
       if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
@@ -462,15 +466,21 @@ async function route(req, res) {
       const month = url.searchParams.get('month');
       if (!month || !/^\d{4}-\d{2}$/.test(month)) return json(res, 400, { error: '잘못된 월' });
       const fb = getFirebase();
-      const snap = await fb.db.collection('schedules').get();
-      const events = {};
       const prefix = month + '-';
-      snap.forEach((doc) => {
+      // Read memos (name source) and schedules (state source) in parallel
+      const [memosSnap, schedsSnap] = await Promise.all([
+        fb.db.collection('memos').get(),
+        fb.db.collection('schedules').get()
+      ]);
+      const statesMap = {};
+      schedsSnap.forEach((doc) => { if (doc.id.startsWith(prefix)) statesMap[doc.id] = doc.data().states || {}; });
+      const events = {};
+      memosSnap.forEach((doc) => {
         if (!doc.id.startsWith(prefix)) return;
-        const data = doc.data();
-        const names = data.names || [];
+        const names = extractScheduleNames(doc.data().memo || '');
         if (names.length > 0) {
-          events[doc.id] = names.map((n) => ({ name: n, state: (data.states || {})[n] ?? 0 }));
+          const states = statesMap[doc.id] || {};
+          events[doc.id] = names.map((n) => ({ name: n, state: states[n] ?? 0 }));
         }
       });
       return json(res, 200, { events });
