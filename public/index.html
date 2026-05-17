@@ -191,6 +191,10 @@ input[type="file"]{width:100%;color:var(--muted)}
   color:var(--text);font-size:13px;opacity:0;pointer-events:none;transition:.2s
 }
 .toast.show{opacity:1;transform:translateX(-50%) translateY(0)}
+.file-card-inner{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:180px;padding:24px 16px;gap:10px;text-align:center;background:#0d0d0d;width:100%;height:100%;text-decoration:none;color:inherit}
+.file-type-badge{font-size:13px;font-weight:900;letter-spacing:.1em;padding:7px 16px;border-radius:5px;border:2px solid var(--line2);color:var(--white);background:var(--bg3)}
+.file-card-name{font-size:12px;color:var(--text);word-break:break-all;max-width:100%;line-height:1.45;margin-top:2px}
+.file-card-size{font-size:11px;color:var(--muted)}
 .photo-ctx{position:fixed;z-index:200;background:#1e1e1e;border:1px solid var(--line2);border-radius:8px;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 8px 28px rgba(0,0,0,.65);min-width:56px}
 .photo-ctx-btn{padding:11px 22px;font-size:22px;color:var(--text);cursor:pointer;border:none;background:none;line-height:1;font-weight:700}
 .photo-ctx-btn:hover:not(:disabled){background:var(--bg3)}
@@ -330,8 +334,8 @@ input[type="file"]{width:100%;color:var(--muted)}
             <input type="date" id="uploadDate" required>
             <button class="hbtn primary" type="submit">사진 올리기</button>
           </div>
-          <input type="file" id="photosInput" name="photos" accept="image/*" multiple required>
-          <p class="small">JPG, PNG, GIF, WEBP, AVIF 이미지를 여러 장 한 번에 올릴 수 있습니다.</p>
+          <input type="file" id="photosInput" name="photos" multiple required>
+          <p class="small">이미지, PDF, HWP, Word, Excel, PPT 등 모든 파일을 여러 개 올릴 수 있습니다.</p>
         </div>
       </form>
 
@@ -437,6 +441,31 @@ async function api(path, options = {}) {
   }
   if (!res.ok) throw new Error(data.error || '요청을 처리하지 못했습니다.');
   return data;
+}
+
+const IMAGE_MIMES = new Set(['image/jpeg','image/png','image/gif','image/webp','image/avif']);
+function isImageFile(photo) {
+  if (photo.isImage !== undefined) return photo.isImage;
+  if (photo.mime) return photo.mime.startsWith('image/');
+  const ext = (photo.originalName || '').split('.').pop().toLowerCase();
+  return ['jpg','jpeg','png','gif','webp','avif'].includes(ext);
+}
+function getFileBadge(photo) {
+  const mime = photo.mime || '';
+  const ext = (photo.originalName || '').split('.').pop().toLowerCase();
+  if (mime === 'application/pdf' || ext === 'pdf') return 'PDF';
+  if (mime.includes('hwp') || ['hwp','hwpx'].includes(ext)) return 'HWP';
+  if (mime.includes('word') || ['doc','docx'].includes(ext)) return 'DOC';
+  if (mime.includes('sheet') || mime.includes('excel') || ['xls','xlsx'].includes(ext)) return 'XLS';
+  if (mime.includes('presentation') || mime.includes('powerpoint') || ['ppt','pptx'].includes(ext)) return 'PPT';
+  if (mime.includes('zip') || ['zip','7z','rar'].includes(ext)) return 'ZIP';
+  return ext.toUpperCase().slice(0, 6) || 'FILE';
+}
+function formatSize(bytes) {
+  if (!bytes) return '';
+  if (bytes < 1024) return bytes + ' B';
+  if (bytes < 1048576) return (bytes / 1024).toFixed(1) + ' KB';
+  return (bytes / 1048576).toFixed(1) + ' MB';
 }
 
 function compressImage(file) {
@@ -603,36 +632,60 @@ async function selectDate(date, openUpload, scrollToViewer = false) {
 
 async function loadPhotos(date) {
   const data = await api(`/api/days/${date}/photos`);
-  const photos = data.photos || [];
-  state.currentPhotos = photos;
-  $('#photoCount').textContent = photos.length ? `사진 ${photos.length}장` : '사진 없음';
+  const allFiles = data.photos || [];
+  const imageFiles = allFiles.filter(p => isImageFile(p));
+  state.currentPhotos = imageFiles;
+  $('#photoCount').textContent = allFiles.length ? `파일 ${allFiles.length}개` : '파일 없음';
   const grid = $('#photos');
   const empty = $('#emptyPhotos');
   grid.innerHTML = '';
-  grid.classList.toggle('hidden', photos.length === 0);
-  empty.classList.toggle('hidden', photos.length > 0);
-  empty.textContent = `${date}에 올라온 사진이 없습니다. 업로드 버튼으로 추가해 주세요.`;
+  grid.classList.toggle('hidden', allFiles.length === 0);
+  empty.classList.toggle('hidden', allFiles.length > 0);
+  empty.textContent = `${date}에 올라온 파일이 없습니다. 업로드 버튼으로 추가해 주세요.`;
 
   loadMemo(date);
 
-  for (const photo of photos) {
-    const index = photos.indexOf(photo);
+  let imageIndex = 0;
+  for (let fileIdx = 0; fileIdx < allFiles.length; fileIdx++) {
+    const photo = allFiles[fileIdx];
     const item = document.createElement('article');
     item.className = 'photo';
-    item.innerHTML = `
-      <a href="${photo.url}" data-gallery-index="${index}"><img src="${photo.url}" alt="${photo.originalName}"></a>
-      <div class="photo-info">
-        <div class="photo-name">${photo.originalName}</div>
-        ${state.role === 'admin' ? `<button class="icon-btn" type="button" title="삭제" aria-label="삭제">×</button>` : ''}
-      </div>
-    `;
-    item.querySelector('a').addEventListener('click', (event) => {
-      event.preventDefault();
-      openGallery(index);
-    });
+    const isImg = isImageFile(photo);
+    const curImageIndex = isImg ? imageIndex++ : -1;
+
+    if (isImg) {
+      const nameEsc = photo.originalName.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      item.innerHTML = `
+        <a href="${photo.url}" data-gallery-index="${curImageIndex}"><img src="${photo.url}" alt="${nameEsc}"></a>
+        <div class="photo-info">
+          <div class="photo-name">${nameEsc}</div>
+          ${state.role === 'admin' ? `<button class="icon-btn" type="button" title="삭제" aria-label="삭제">×</button>` : ''}
+        </div>
+      `;
+      item.querySelector('a').addEventListener('click', (event) => {
+        event.preventDefault();
+        openGallery(curImageIndex);
+      });
+    } else {
+      const badge = getFileBadge(photo);
+      const nameEsc = photo.originalName.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+      const size = formatSize(photo.size);
+      item.innerHTML = `
+        <a class="file-card-inner" href="${photo.url}" target="_blank" rel="noreferrer" download="${nameEsc}">
+          <div class="file-type-badge">${badge}</div>
+          <div class="file-card-name">${nameEsc}</div>
+          ${size ? `<div class="file-card-size">${size}</div>` : ''}
+        </a>
+        <div class="photo-info">
+          <div class="photo-name">${nameEsc}</div>
+          ${state.role === 'admin' ? `<button class="icon-btn" type="button" title="삭제" aria-label="삭제">×</button>` : ''}
+        </div>
+      `;
+    }
+
     const delBtn = item.querySelector('button');
     if (delBtn) delBtn.addEventListener('click', async () => {
-      if (!confirm('이 사진을 삭제할까요?')) return;
+      if (!confirm('이 파일을 삭제할까요?')) return;
       await api(`/api/photos/${photo.id}`, { method: 'DELETE' });
       toast('삭제했습니다.');
       await loadDays();
@@ -642,8 +695,8 @@ async function loadPhotos(date) {
       item.addEventListener('contextmenu', (e) => {
         e.preventDefault();
         ctxPhotoId = photo.id;
-        $('#photoCtxUp').disabled = index === 0;
-        $('#photoCtxDown').disabled = index === photos.length - 1;
+        $('#photoCtxUp').disabled = fileIdx === 0;
+        $('#photoCtxDown').disabled = fileIdx === allFiles.length - 1;
         const ctx = $('#photoCtx');
         ctx.style.left = e.clientX + 'px';
         ctx.style.top = e.clientY + 'px';
@@ -658,7 +711,7 @@ async function loadPhotos(date) {
     grid.appendChild(item);
   }
 
-  return photos;
+  return allFiles;
 }
 
 function renderGallery() {
