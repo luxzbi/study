@@ -306,6 +306,11 @@ input[type="file"]{width:100%;color:var(--muted)}
     <div class="calendar-grid" id="calendarGrid"></div>
   </section>
 
+  <div id="calContestBar" style="display:none;padding:8px 14px;border:1px solid var(--line);background:var(--bg2);margin-bottom:22px;flex-wrap:wrap;gap:6px;align-items:center">
+    <span style="font-size:11px;color:var(--muted);flex:0 0 auto">이날 대회</span>
+    <div id="calContestNames" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+  </div>
+
   <section class="panel undated-panel" id="undatedPanel">
     <div class="panel-head">
       <strong>미정 일정 · 수행평가</strong>
@@ -877,6 +882,17 @@ function renderCalendar() {
   }
 }
 
+function renderCalContestBar(date) {
+  const bar = $('#calContestBar');
+  const namesEl = $('#calContestNames');
+  const evts = (state.calendarEvents[date] || []).filter((e) => e.type === 'contest');
+  if (!evts.length) { bar.style.display = 'none'; return; }
+  namesEl.innerHTML = evts.map((e) =>
+    `<span style="font-size:12px;font-weight:700;color:var(--white);background:var(--bg3);border:1px solid var(--line2);padding:2px 10px">${e.name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</span>`
+  ).join('');
+  bar.style.display = 'flex';
+}
+
 async function loadCalendarEvents(month) {
   try {
     const data = await api(`/api/events?month=${month}`);
@@ -905,6 +921,7 @@ async function selectDate(date, openUpload, scrollToViewer = false) {
   $('#uploadForm').classList.toggle('open', Boolean(openUpload) && state.role === 'admin');
   renderDays();
   renderCalendar();
+  renderCalContestBar(date);
   await loadPhotos(date);
   if (scrollToViewer) {
     const target = document.querySelector('.viewer .panel-head');
@@ -1105,6 +1122,7 @@ $('#prevMonthBtn').addEventListener('click', async () => {
   state.calendarMonth = dateKey(d.getFullYear(), d.getMonth() + 1, 1).slice(0, 7);
   await loadCalendarEvents(state.calendarMonth);
   renderCalendar();
+  if (state.selectedDate) renderCalContestBar(state.selectedDate);
 });
 
 $('#nextMonthBtn').addEventListener('click', async () => {
@@ -1113,6 +1131,7 @@ $('#nextMonthBtn').addEventListener('click', async () => {
   state.calendarMonth = dateKey(d.getFullYear(), d.getMonth() + 1, 1).slice(0, 7);
   await loadCalendarEvents(state.calendarMonth);
   renderCalendar();
+  if (state.selectedDate) renderCalContestBar(state.selectedDate);
 });
 
 $('#toggleUploadBtn').addEventListener('click', () => {
