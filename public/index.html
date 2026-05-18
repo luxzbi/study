@@ -229,6 +229,18 @@ input[type="file"]{width:100%;color:var(--muted)}
 .sched-e.holiday{color:#e05252}
 .sched-e.exam{color:#60a5fa;font-weight:700}
 .sched-tab-btn.active{background:var(--white);color:#111;border-color:var(--white)}
+.contest-card{display:flex;align-items:center;justify-content:space-between;gap:12px;min-height:72px;padding:14px 16px;border-bottom:1px solid var(--line);text-align:left;transition:background .15s;background:none;width:100%;color:inherit}
+.contest-card:last-child{border-bottom:0}
+.contest-card:hover{background:var(--bg3)}
+.contest-card-name{font-size:1rem;font-weight:850;color:var(--white)}
+.contest-card-meta{margin-top:4px;font-size:12px;color:var(--muted)}
+.contest-chip{padding:3px 9px;border-radius:20px;font-size:12px;font-weight:700;border:1px solid var(--line2);background:var(--bg3);color:var(--text);cursor:pointer;transition:background .12s}
+.contest-chip:hover{background:#222}
+.contest-chip.state-1{border-color:var(--good);color:var(--good);background:rgba(82,200,122,.1)}
+.contest-chip.state-2{border-color:var(--muted2);color:var(--muted2);text-decoration:line-through;background:none}
+.contest-img-thumb{width:64px;height:48px;object-fit:cover;border-radius:4px;border:1px solid var(--line);cursor:pointer}
+.contest-textarea{width:100%;resize:vertical;min-height:100px;background:var(--bg3);border:1px solid var(--line2);color:var(--text);padding:10px;font-family:inherit;font-size:13px;border-radius:0;outline:none}
+.contest-textarea:focus{border-color:var(--white)}
 @media (max-width:820px){
   #header{padding:0 14px}.page{padding:24px 12px 60px}
   .topline{align-items:start;flex-direction:column}.layout{grid-template-columns:1fr}
@@ -256,6 +268,7 @@ input[type="file"]{width:100%;color:var(--muted)}
   <button class="page-tab active" id="tabCalendar" type="button">달력관리</button>
   <button class="page-tab" id="tabStudy" type="button">자습관리</button>
   <button class="page-tab" id="tabSchedule" type="button">학사일정</button>
+  <button class="page-tab" id="tabContest" type="button">대회관리</button>
 </div>
 
 <main id="loginScreen" class="login-screen">
@@ -531,6 +544,49 @@ input[type="file"]{width:100%;color:var(--muted)}
   </div>
 </main>
 
+<main id="contestApp" class="page hidden">
+  <div class="topline" style="margin-bottom:22px">
+    <div class="title">
+      <h1>대회관리</h1>
+      <p>참가 대회 일정을 관리합니다.</p>
+    </div>
+    <button class="hbtn primary" id="contestAddBtn" type="button">+ 추가</button>
+  </div>
+
+  <!-- Editor -->
+  <div id="contestEditorWrap" style="display:none;margin-bottom:22px">
+    <div class="panel">
+      <div class="panel-head">
+        <strong id="contestEditorTitle">새 대회</strong>
+        <div style="display:flex;gap:8px">
+          <button class="hbtn" id="contestCancelBtn" type="button">취소</button>
+          <button class="hbtn danger" id="contestDeleteBtn" type="button" style="display:none">삭제</button>
+          <button class="hbtn primary" id="contestSaveBtn" type="button">저장</button>
+        </div>
+      </div>
+      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+        <input id="contestNameInput" type="text" placeholder="대회 이름" style="width:100%;height:38px;padding:0 12px;background:var(--bg3);border:1px solid var(--line2);color:var(--text);font-size:14px;font-weight:700;outline:none">
+        <textarea id="contestContentInput" class="contest-textarea" rows="5" placeholder="&lt;t&gt;26.7.1 예선/&#10;&lt;u&gt;https://대회사이트/&#10;&lt;d&gt;'일정이름'/&#10;&lt;bold&gt;중요/"></textarea>
+        <div id="contestDatesWrap" style="display:none">
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">파싱된 날짜 (클릭으로 상태 변경)</div>
+          <div id="contestDatesChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        </div>
+        <div>
+          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">이미지</div>
+          <div id="contestImagesWrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+          <input type="file" id="contestImgInput" multiple accept="image/*" style="display:none">
+          <button class="hbtn" id="contestImgBtn" type="button">이미지 추가</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- List -->
+  <div class="panel">
+    <div id="contestList"><div class="empty">대회를 추가해 보세요.</div></div>
+  </div>
+</main>
+
 <div class="photo-ctx hidden" id="photoCtx">
   <button class="photo-ctx-btn" id="photoCtxUp" title="위로">↑</button>
   <button class="photo-ctx-btn" id="photoCtxDown" title="아래로">↓</button>
@@ -677,13 +733,16 @@ function setPage(page) {
   $('#app').classList.toggle('hidden', page !== 'calendar');
   $('#studyApp').classList.toggle('hidden', page !== 'study');
   $('#scheduleApp').classList.toggle('hidden', page !== 'schedule');
+  $('#contestApp').classList.toggle('hidden', page !== 'contest');
   $('#tabCalendar').classList.toggle('active', page === 'calendar');
   $('#tabStudy').classList.toggle('active', page === 'study');
   $('#tabSchedule').classList.toggle('active', page === 'schedule');
+  $('#tabContest').classList.toggle('active', page === 'contest');
   if (page === 'study') {
     if (!state.studyWeek) state.studyWeek = getMondayOfWeek(today());
     loadStudyWeek(state.studyWeek);
   }
+  if (page === 'contest') loadContests();
 }
 
 function showApp() {
@@ -693,6 +752,7 @@ function showApp() {
   $('#app').classList.toggle('hidden', !loggedIn);
   $('#studyApp').classList.add('hidden');
   $('#scheduleApp').classList.add('hidden');
+  $('#contestApp').classList.add('hidden');
   $('#pageTabs').classList.toggle('hidden', !loggedIn);
   $('#logoutBtn').classList.toggle('hidden', !loggedIn);
   $('#toggleUploadBtn').classList.toggle('hidden', !isAdmin);
@@ -1344,6 +1404,7 @@ async function saveStudyCell(day, slot, text) {
 $('#tabCalendar').addEventListener('click', () => setPage('calendar'));
 $('#tabStudy').addEventListener('click', () => setPage('study'));
 $('#tabSchedule').addEventListener('click', () => setPage('schedule'));
+$('#tabContest').addEventListener('click', () => setPage('contest'));
 
 $('#studyPrevBtn').addEventListener('click', () => {
   const d = new Date(state.studyWeek + 'T12:00:00');
@@ -1371,6 +1432,184 @@ $('#studyTodayBtn').addEventListener('click', () => loadStudyWeek(getMondayOfWee
 })();
 
 $('#uploadDate').value = today();
+
+// ─── 대회관리 ───────────────────────────────────────
+let _contests = [];
+let _editingContest = null;
+let _localDates = [];
+
+function parseContestDates(content) {
+  const dates = [];
+  const re = /<t>(\d{2})\.(\d{1,2})\.(\d{1,2})[ \t]*([^/\n]*)\//g;
+  let m;
+  while ((m = re.exec(content)) !== null) {
+    const y = 2000 + parseInt(m[1], 10);
+    const mo = String(parseInt(m[2], 10)).padStart(2, '0');
+    const d = String(parseInt(m[3], 10)).padStart(2, '0');
+    dates.push({ date: `${y}-${mo}-${d}`, label: m[4].trim() });
+  }
+  return dates;
+}
+
+function renderLocalDates() {
+  const wrap = $('#contestDatesWrap');
+  const chips = $('#contestDatesChips');
+  if (!_localDates.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  chips.innerHTML = '';
+  _localDates.forEach((d, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `contest-chip${d.state === 1 ? ' state-1' : d.state === 2 ? ' state-2' : ''}`;
+    btn.textContent = d.label ? `${d.date} ${d.label}` : d.date;
+    btn.addEventListener('click', () => {
+      _localDates[i].state = (_localDates[i].state + 1) % 3;
+      renderLocalDates();
+    });
+    chips.appendChild(btn);
+  });
+}
+
+function syncDatesFromContent() {
+  const parsed = parseContestDates($('#contestContentInput').value);
+  _localDates = parsed.map((p) => {
+    const existing = (_editingContest ? (_editingContest.dates || []) : []).find((e) => e.date === p.date && e.label === p.label);
+    return { ...p, state: existing ? (existing.state ?? 0) : 0 };
+  });
+  renderLocalDates();
+}
+
+function renderContestImages(images) {
+  const wrap = $('#contestImagesWrap');
+  wrap.innerHTML = (images || []).map((img) =>
+    `<img class="contest-img-thumb" src="${img.url}" alt="${img.originalName || ''}">`
+  ).join('');
+}
+
+function openContestEditor(contest) {
+  _editingContest = contest || null;
+  const isNew = !contest;
+  $('#contestEditorTitle').textContent = isNew ? '새 대회' : '대회 수정';
+  $('#contestDeleteBtn').style.display = isNew ? 'none' : '';
+  $('#contestNameInput').value = contest ? contest.name : '';
+  $('#contestContentInput').value = contest ? contest.content : '';
+  _localDates = (contest ? contest.dates || [] : []).map((d) => ({ ...d }));
+  renderLocalDates();
+  renderContestImages(contest ? contest.images : []);
+  $('#contestEditorWrap').style.display = '';
+  $('#contestEditorWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function closeContestEditor() {
+  $('#contestEditorWrap').style.display = 'none';
+  _editingContest = null;
+  _localDates = [];
+}
+
+async function loadContests() {
+  try {
+    const data = await api('/api/contests');
+    _contests = data.contests || [];
+  } catch { _contests = []; }
+  renderContestList();
+}
+
+function renderContestList() {
+  const el = $('#contestList');
+  if (!_contests.length) {
+    el.innerHTML = '<div class="empty">대회를 추가해 보세요.</div>';
+    return;
+  }
+  el.innerHTML = '';
+  for (const c of _contests) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = 'contest-card';
+    const dateCount = (c.dates || []).length;
+    const imgCount = (c.images || []).length;
+    btn.innerHTML = `<div><div class="contest-card-name">${c.name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div><div class="contest-card-meta">${dateCount}개 일정${imgCount ? ` · 이미지 ${imgCount}장` : ''}</div></div><span style="color:var(--muted);font-size:18px">›</span>`;
+    btn.addEventListener('click', () => openContestEditor(c));
+    el.appendChild(btn);
+  }
+}
+
+$('#contestAddBtn').addEventListener('click', () => openContestEditor(null));
+$('#contestCancelBtn').addEventListener('click', closeContestEditor);
+$('#contestContentInput').addEventListener('input', syncDatesFromContent);
+
+$('#contestSaveBtn').addEventListener('click', async () => {
+  const name = $('#contestNameInput').value.trim();
+  const content = $('#contestContentInput').value.trim();
+  if (!name) { toast('대회 이름을 입력해 주세요.'); return; }
+  const dates = _localDates.map((d) => ({ date: d.date, label: d.label || '', state: d.state ?? 0 }));
+  try {
+    const method = _editingContest ? 'PUT' : 'POST';
+    const url = _editingContest ? `/api/contests/${_editingContest.id}` : '/api/contests';
+    const data = await api(url, {
+      method,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ name, content, dates })
+    });
+    _editingContest = data.contest;
+    if (_contestImgPending && _contestImgPending.length) {
+      const fd = new FormData();
+      for (const f of _contestImgPending) fd.append('images', f);
+      await fetch(`/api/contests/${data.contest.id}/images`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${state.token}` },
+        body: fd
+      });
+      _contestImgPending = [];
+    }
+    await loadContests();
+    closeContestEditor();
+    await loadCalendarEvents(state.calendarMonth);
+    renderCalendar();
+    toast('저장되었습니다.');
+  } catch (e) { toast(e.message || '저장 실패'); }
+});
+
+$('#contestDeleteBtn').addEventListener('click', async () => {
+  if (!_editingContest) return;
+  if (!confirm(`"${_editingContest.name}" 대회를 삭제할까요?`)) return;
+  try {
+    await api(`/api/contests/${_editingContest.id}`, { method: 'DELETE' });
+    await loadContests();
+    closeContestEditor();
+    await loadCalendarEvents(state.calendarMonth);
+    renderCalendar();
+    toast('삭제되었습니다.');
+  } catch (e) { toast(e.message || '삭제 실패'); }
+});
+
+let _contestImgPending = [];
+$('#contestImgBtn').addEventListener('click', () => $('#contestImgInput').click());
+$('#contestImgInput').addEventListener('change', async (e) => {
+  const files = Array.from(e.target.files || []);
+  if (!files.length) return;
+  e.target.value = '';
+  if (_editingContest && _editingContest.id) {
+    const fd = new FormData();
+    for (const f of files) fd.append('images', f);
+    try {
+      const res = await fetch(`/api/contests/${_editingContest.id}/images`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${state.token}` },
+        body: fd
+      });
+      const data = await res.json();
+      if (!res.ok) { toast(data.error || '이미지 업로드 실패'); return; }
+      _editingContest.images = data.images;
+      renderContestImages(data.images);
+      toast('이미지 업로드 완료');
+    } catch { toast('이미지 업로드 실패'); }
+  } else {
+    _contestImgPending = [..._contestImgPending, ...files];
+    renderContestImages(_contestImgPending.map((f) => ({ url: URL.createObjectURL(f), originalName: f.name })));
+  }
+});
+// ────────────────────────────────────────────────────
+
 showApp();
 </script>
 </body>

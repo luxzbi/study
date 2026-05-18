@@ -194,8 +194,8 @@ function safeDate(value) {
 
 function cleanName(name) {
   const ext = path.extname(name || '').toLowerCase();
-  const allowedExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.avif'].includes(ext) ? ext : '.jpg';
-  return `${Date.now()}-${crypto.randomUUID()}${allowedExt}`;
+  const safeExt = /^\.[a-z0-9]{1,10}$/.test(ext) ? ext : '';
+  return `${Date.now()}-${crypto.randomUUID()}${safeExt}`;
 }
 
 function headerValue(header, key) {
@@ -302,7 +302,6 @@ async function savePhotos(date, files) {
 
   const saved = [];
   for (const file of files) {
-    if (!IMAGE_TYPES.has(file.mime)) throw new Error('이미지 파일만 업로드할 수 있습니다.');
     const filename = cleanName(file.filename);
     const relative = `/uploads/${filename}`;
     fs.writeFileSync(path.join(UPLOAD_DIR, filename), file.data);
@@ -313,6 +312,7 @@ async function savePhotos(date, files) {
       filename,
       url: relative,
       mime: file.mime,
+      isImage: IMAGE_TYPES.has(file.mime),
       size: file.data.length,
       createdAt: Date.now()
     });
@@ -330,11 +330,10 @@ async function savePhotosToFirebase(date, files) {
   const fb = getFirebase();
 
   for (const file of files) {
-    if (!IMAGE_TYPES.has(file.mime)) throw new Error('이미지 파일만 업로드할 수 있습니다.');
     const filename = cleanName(file.filename);
     const blob = await put(`uploads/${date}/${filename}`, file.data, {
       access: 'public',
-      contentType: file.mime
+      contentType: file.mime || 'application/octet-stream'
     });
 
     const doc = {
@@ -344,6 +343,7 @@ async function savePhotosToFirebase(date, files) {
       blobUrl: blob.url,
       url: blob.url,
       mime: file.mime,
+      isImage: IMAGE_TYPES.has(file.mime),
       size: file.data.length,
       createdAt: Date.now()
     };
@@ -484,10 +484,10 @@ async function route(req, res) {
       if (!month || !/^\d{4}-\d{2}$/.test(month)) return json(res, 400, { error: '잘못된 월' });
       const fb = getFirebase();
       const prefix = month + '-';
-      // Read memos (name source) and schedules (state source) in parallel
-      const [memosSnap, schedsSnap] = await Promise.all([
+      const [memosSnap, schedsSnap, contestsSnap] = await Promise.all([
         fb.db.collection('memos').get(),
-        fb.db.collection('schedules').get()
+        fb.db.collection('schedules').get(),
+        fb.db.collection('contests').get()
       ]);
       const statesMap = {};
       schedsSnap.forEach((doc) => { if (doc.id.startsWith(prefix)) statesMap[doc.id] = doc.data().states || {}; });
@@ -498,6 +498,15 @@ async function route(req, res) {
         if (names.length > 0) {
           const states = statesMap[doc.id] || {};
           events[doc.id] = names.map((n) => ({ name: n, state: states[n] ?? 0 }));
+        }
+      });
+      contestsSnap.forEach((doc) => {
+        const c = doc.data();
+        for (const d of (c.dates || [])) {
+          if (d.date && d.date.startsWith(prefix)) {
+            if (!events[d.date]) events[d.date] = [];
+            events[d.date].push({ name: c.name, state: d.state ?? 0, type: 'contest', contestId: doc.id });
+          }
         }
       });
       return json(res, 200, { events });
@@ -605,6 +614,82 @@ async function route(req, res) {
       });
       res.end(buffer);
       return;
+    }
+
+    if (req.method === 'GET' && pathname === '/api/contests') {
+      const fb = getFirebase();
+      const snap = await fb.db.collection('contests').orderBy('createdAt', 'desc').get();
+      return json(res, 200, { contests: snap.docs.map((d) => ({ id: d.id, ...d.data() })) });
+    }
+
+    if (req.method === 'POST' && pathname === '/api/contests') {
+      if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
+      const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
+      const name = typeof body.name === 'string' ? body.name.slice(0, 200) : '';
+      const content = typeof body.content === 'string' ? body.content.slice(0, 5000) : '';
+      if (!name) return json(res, 400, { error: '이름을 입력해 주세요.' });
+      const dates = Array.isArray(body.dates) ? body.dates.slice(0, 100).map((d) => ({
+        date: safeDate(d.date), label: typeof d.label === 'string' ? d.label.slice(0, 100) : '',
+        state: [0, 1, 2].includes(Number(d.state)) ? Number(d.state) : 0
+      })).filter((d) => d.date) : [];
+      const fb = getFirebase();
+      const doc = { name, content, dates, images: [], createdAt: Date.now(), updatedAt: Date.now() };
+      const ref = await fb.db.collection('contests').add(doc);
+      return json(res, 201, { contest: { id: ref.id, ...doc } });
+    }
+
+    const contestImgMatch = /^\/api\/contests\/([^/]+)\/images$/.exec(pathname);
+    if (req.method === 'POST' && contestImgMatch) {
+      if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
+      const fb = getFirebase();
+      const ref = fb.db.collection('contests').doc(contestImgMatch[1]);
+      const existing = await ref.get();
+      if (!existing.exists) return json(res, 404, { error: '대회를 찾을 수 없습니다.' });
+      const parsed = parseMultipart(await readBody(req), req.headers['content-type']);
+      const files = parsed.files.filter((f) => f.field === 'images' && IMAGE_TYPES.has(f.mime));
+      if (!files.length) return json(res, 400, { error: '이미지를 선택해 주세요.' });
+      const { put } = require('@vercel/blob');
+      const newImages = [];
+      for (const file of files) {
+        const filename = cleanName(file.filename);
+        const blob = await put(`contest-images/${contestImgMatch[1]}/${filename}`, file.data, {
+          access: 'public', contentType: file.mime
+        });
+        newImages.push({ url: blob.url, filename, originalName: file.filename, createdAt: Date.now() });
+      }
+      const images = [...(existing.data().images || []), ...newImages];
+      await ref.update({ images, updatedAt: Date.now() });
+      return json(res, 201, { images });
+    }
+
+    const contestMatch = /^\/api\/contests\/([^/]+)$/.exec(pathname);
+    if (req.method === 'GET' && contestMatch) {
+      const fb = getFirebase();
+      const doc = await fb.db.collection('contests').doc(contestMatch[1]).get();
+      if (!doc.exists) return json(res, 404, { error: '대회를 찾을 수 없습니다.' });
+      return json(res, 200, { contest: { id: doc.id, ...doc.data() } });
+    }
+    if (req.method === 'PUT' && contestMatch) {
+      if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
+      const body = JSON.parse((await readBody(req)).toString('utf8') || '{}');
+      const fb = getFirebase();
+      const ref = fb.db.collection('contests').doc(contestMatch[1]);
+      const existing = await ref.get();
+      if (!existing.exists) return json(res, 404, { error: '대회를 찾을 수 없습니다.' });
+      const name = typeof body.name === 'string' ? body.name.slice(0, 200) : existing.data().name;
+      const content = typeof body.content === 'string' ? body.content.slice(0, 5000) : existing.data().content;
+      const dates = Array.isArray(body.dates) ? body.dates.slice(0, 100).map((d) => ({
+        date: safeDate(d.date), label: typeof d.label === 'string' ? d.label.slice(0, 100) : '',
+        state: [0, 1, 2].includes(Number(d.state)) ? Number(d.state) : 0
+      })).filter((d) => d.date) : existing.data().dates;
+      await ref.update({ name, content, dates, updatedAt: Date.now() });
+      return json(res, 200, { contest: { id: ref.id, ...existing.data(), name, content, dates, updatedAt: Date.now() } });
+    }
+    if (req.method === 'DELETE' && contestMatch) {
+      if (!verifyToken(req)) return json(res, 401, { error: '로그인이 필요합니다.' });
+      const fb = getFirebase();
+      await fb.db.collection('contests').doc(contestMatch[1]).delete();
+      return json(res, 200, { ok: true });
     }
 
     if (req.method === 'GET') return serveStatic(req, res, pathname);
