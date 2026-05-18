@@ -588,12 +588,40 @@ input[type="file"]{width:100%;color:var(--muted)}
             <button class="hbtn primary" id="contestSaveBtn" type="button">저장</button>
           </div>
         </div>
-        <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-          <textarea id="contestContentInput" class="contest-textarea" rows="5" placeholder="&lt;t&gt;26.7.1 예선/&#10;&lt;u&gt;https://대회사이트/&#10;&lt;d&gt;'일정이름'/&#10;&lt;bold&gt;중요/"></textarea>
-          <div id="contestDatesWrap" style="display:none">
-            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">파싱된 날짜 (클릭으로 상태 변경)</div>
-            <div id="contestDatesChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:14px">
+          <textarea id="contestContentInput" class="contest-textarea" rows="4" placeholder="&lt;u&gt;https://대회사이트/&#10;&lt;d&gt;'일정이름'/&#10;&lt;bold&gt;중요내용/"></textarea>
+          <!-- Dates section -->
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">일정</div>
+            <div id="contestDatesChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:8px"></div>
+            <button class="hbtn" id="contestDatePickerBtn" type="button">+ 날짜 추가</button>
+            <!-- Mini calendar picker -->
+            <div id="contestMiniCal" style="display:none;margin-top:10px;background:var(--bg);border:1px solid var(--line2);padding:12px;max-width:272px">
+              <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px">
+                <button class="hbtn" id="contestCalPrev" type="button" style="padding:0 10px">‹</button>
+                <span id="contestCalTitle" style="font-size:13px;font-weight:700;color:var(--white)"></span>
+                <button class="hbtn" id="contestCalNext" type="button" style="padding:0 10px">›</button>
+              </div>
+              <div style="display:grid;grid-template-columns:repeat(7,1fr);text-align:center;margin-bottom:4px">
+                <span style="font-size:11px;color:#e05252;padding:3px 0">일</span>
+                <span style="font-size:11px;color:var(--muted);padding:3px 0">월</span>
+                <span style="font-size:11px;color:var(--muted);padding:3px 0">화</span>
+                <span style="font-size:11px;color:var(--muted);padding:3px 0">수</span>
+                <span style="font-size:11px;color:var(--muted);padding:3px 0">목</span>
+                <span style="font-size:11px;color:var(--muted);padding:3px 0">금</span>
+                <span style="font-size:11px;color:#60a5fa;padding:3px 0">토</span>
+              </div>
+              <div id="contestCalGrid" style="display:grid;grid-template-columns:repeat(7,1fr);gap:2px"></div>
+              <div id="contestCalLabelWrap" style="display:none;margin-top:10px;border-top:1px solid var(--line);padding-top:10px">
+                <div style="font-size:12px;color:var(--muted);margin-bottom:6px">선택: <strong id="contestCalSelectedDate" style="color:var(--white)"></strong></div>
+                <div style="display:flex;gap:6px">
+                  <input id="contestCalLabel" type="text" placeholder="라벨 (예: 예선, 제출마감)" style="flex:1;height:30px;padding:0 8px;background:var(--bg3);border:1px solid var(--line2);color:var(--text);font-size:12px;outline:none">
+                  <button class="hbtn primary" id="contestCalConfirm" type="button">추가</button>
+                </div>
+              </div>
+            </div>
           </div>
+          <!-- Images -->
           <div>
             <div style="font-size:12px;color:var(--muted);margin-bottom:8px">이미지</div>
             <div id="contestImagesWrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
@@ -1464,23 +1492,9 @@ let _editingContest = null;
 let _localDates = [];
 let _contestImgPending = [];
 
-function parseContestDates(content) {
-  const dates = [];
-  const re = /<t>(\d{2})\.(\d{1,2})\.(\d{1,2})[ \t]*([^/\n]*)\//g;
-  let m;
-  while ((m = re.exec(content)) !== null) {
-    const y = 2000 + parseInt(m[1], 10);
-    const mo = String(parseInt(m[2], 10)).padStart(2, '0');
-    const d = String(parseInt(m[3], 10)).padStart(2, '0');
-    dates.push({ date: `${y}-${mo}-${d}`, label: m[4].trim() });
-  }
-  return dates;
-}
-
 function contestLinkify(content) {
   if (!content) return '';
-  const withoutT = content.replace(/<t>\d{2}\.\d{1,2}\.\d{1,2}[^\n]*/g, '').replace(/\n{3,}/g, '\n\n').trim();
-  return linkify(withoutT);
+  return linkify(content);
 }
 
 function contestUrgencyKey(c) {
@@ -1619,6 +1633,8 @@ function enterContestEdit() {
   $('#contestDeleteBtn').style.display = (c && c.id) ? '' : 'none';
   _localDates = (c ? c.dates || [] : []).map((d) => ({ ...d }));
   _contestImgPending = [];
+  _miniCalPending = null;
+  $('#contestMiniCal').style.display = 'none';
   renderEditDates();
   renderEditImages(c ? c.images || [] : []);
   $('#contestViewMode').style.display = 'none';
@@ -1626,36 +1642,113 @@ function enterContestEdit() {
 }
 
 function renderEditDates() {
-  const wrap = $('#contestDatesWrap');
   const chips = $('#contestDatesChips');
-  if (!_localDates.length) { wrap.style.display = 'none'; return; }
-  wrap.style.display = '';
   chips.innerHTML = '';
   _localDates.forEach((d, i) => {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = `contest-chip${d.state === 1 ? ' state-1' : d.state === 2 ? ' state-2' : ''}`;
     btn.textContent = d.label ? `${d.date} ${d.label}` : d.date;
+    btn.title = '클릭: 상태 변경 / 길게 클릭: 삭제';
+    let pressTimer;
+    btn.addEventListener('mousedown', () => { pressTimer = setTimeout(() => { _localDates.splice(i, 1); renderEditDates(); }, 600); });
+    btn.addEventListener('mouseup', () => clearTimeout(pressTimer));
+    btn.addEventListener('mouseleave', () => clearTimeout(pressTimer));
     btn.addEventListener('click', () => { _localDates[i].state = (_localDates[i].state + 1) % 3; renderEditDates(); });
     chips.appendChild(btn);
   });
 }
 
 function renderEditImages(images) {
-  const wrap = $('#contestImagesWrap');
-  wrap.innerHTML = (images || []).map((img) =>
+  $('#contestImagesWrap').innerHTML = (images || []).map((img) =>
     `<img class="contest-img-thumb" src="${img.url}" alt="${img.originalName || ''}">`
   ).join('');
 }
 
-$('#contestContentInput').addEventListener('input', () => {
-  const val = $('#contestContentInput').value;
-  const parsed = parseContestDates(val);
-  _localDates = parsed.map((p) => {
-    const existing = (_editingContest ? (_editingContest.dates || []) : []).find((e) => e.date === p.date && e.label === p.label);
-    return { ...p, state: existing ? (existing.state ?? 0) : 0 };
-  });
+// ── Mini calendar picker ──
+let _miniCalMonth = today().slice(0, 7);
+let _miniCalPending = null;
+
+function renderMiniCal() {
+  const [y, m] = _miniCalMonth.split('-').map(Number);
+  $('#contestCalTitle').textContent = `${y}년 ${m}월`;
+  const grid = $('#contestCalGrid');
+  grid.innerHTML = '';
+  const first = new Date(y, m - 1, 1);
+  const start = new Date(y, m - 1, 1 - first.getDay());
+  const t = today();
+  for (let i = 0; i < 42; i++) {
+    const d = new Date(start.getTime());
+    d.setDate(start.getDate() + i);
+    const key = dateKey(d.getFullYear(), d.getMonth() + 1, d.getDate());
+    const inMonth = d.getMonth() + 1 === m;
+    const isToday = key === t;
+    const isSun = d.getDay() === 0;
+    const isSat = d.getDay() === 6;
+    const already = _localDates.some((ld) => ld.date === key);
+    const cell = document.createElement('button');
+    cell.type = 'button';
+    cell.textContent = d.getDate();
+    cell.style.cssText = [
+      'padding:5px 2px;font-size:12px;text-align:center;border-radius:3px;width:100%',
+      !inMonth ? 'color:var(--muted2)' : isSun ? 'color:#e05252' : isSat ? 'color:#60a5fa' : 'color:var(--text)',
+      isToday ? 'font-weight:900;text-decoration:underline' : '',
+      already ? 'background:var(--line2)' : '',
+      _miniCalPending === key ? 'outline:1px solid var(--white)' : ''
+    ].filter(Boolean).join(';');
+    cell.addEventListener('click', () => {
+      _miniCalPending = key;
+      $('#contestCalSelectedDate').textContent = key;
+      $('#contestCalLabel').value = '';
+      $('#contestCalLabelWrap').style.display = '';
+      $('#contestCalLabel').focus();
+      renderMiniCal();
+    });
+    grid.appendChild(cell);
+  }
+}
+
+$('#contestDatePickerBtn').addEventListener('click', () => {
+  const cal = $('#contestMiniCal');
+  if (cal.style.display === 'none') {
+    _miniCalMonth = today().slice(0, 7);
+    _miniCalPending = null;
+    $('#contestCalLabelWrap').style.display = 'none';
+    renderMiniCal();
+    cal.style.display = '';
+  } else {
+    cal.style.display = 'none';
+  }
+});
+
+$('#contestCalPrev').addEventListener('click', () => {
+  const [y, m] = _miniCalMonth.split('-').map(Number);
+  const prev = m === 1 ? `${y - 1}-12` : `${y}-${String(m - 1).padStart(2, '0')}`;
+  _miniCalMonth = prev;
+  renderMiniCal();
+});
+
+$('#contestCalNext').addEventListener('click', () => {
+  const [y, m] = _miniCalMonth.split('-').map(Number);
+  const next = m === 12 ? `${y + 1}-01` : `${y}-${String(m + 1).padStart(2, '0')}`;
+  _miniCalMonth = next;
+  renderMiniCal();
+});
+
+$('#contestCalLabel').addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') $('#contestCalConfirm').click();
+});
+
+$('#contestCalConfirm').addEventListener('click', () => {
+  if (!_miniCalPending) return;
+  const label = $('#contestCalLabel').value.trim();
+  const already = _localDates.findIndex((d) => d.date === _miniCalPending && d.label === label);
+  if (already === -1) _localDates.push({ date: _miniCalPending, label, state: 0 });
+  _miniCalPending = null;
+  $('#contestCalLabelWrap').style.display = 'none';
+  $('#contestMiniCal').style.display = 'none';
   renderEditDates();
+  renderMiniCal();
 });
 
 $('#contestCancelEditBtn').addEventListener('click', () => {
@@ -1720,6 +1813,8 @@ $('#contestAddBtn').addEventListener('click', () => {
   $('#contestDeleteBtn').style.display = 'none';
   _localDates = [];
   _contestImgPending = [];
+  _miniCalPending = null;
+  $('#contestMiniCal').style.display = 'none';
   renderEditDates();
   renderEditImages([]);
   $('#contestViewWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
