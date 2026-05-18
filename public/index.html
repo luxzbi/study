@@ -553,32 +553,56 @@ input[type="file"]{width:100%;color:var(--muted)}
     <button class="hbtn primary" id="contestAddBtn" type="button">+ 추가</button>
   </div>
 
-  <!-- Editor -->
-  <div id="contestEditorWrap" style="display:none;margin-bottom:22px">
+  <!-- Selected contest panel -->
+  <div id="contestViewWrap" style="display:none;margin-bottom:22px">
     <div class="panel">
-      <div class="panel-head">
-        <strong id="contestEditorTitle">새 대회</strong>
-        <div style="display:flex;gap:8px">
-          <button class="hbtn" id="contestCancelBtn" type="button">취소</button>
-          <button class="hbtn danger" id="contestDeleteBtn" type="button" style="display:none">삭제</button>
-          <button class="hbtn primary" id="contestSaveBtn" type="button">저장</button>
+
+      <!-- View mode -->
+      <div id="contestViewMode">
+        <div class="panel-head">
+          <strong id="contestViewName" style="font-size:15px"></strong>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="hbtn" id="contestViewCloseBtn" type="button">닫기</button>
+            <button class="icon-btn" id="contestViewEditBtn" title="수정" style="font-size:14px">✎</button>
+          </div>
+        </div>
+        <div style="padding:14px 16px;display:flex;flex-direction:column;gap:12px">
+          <div id="contestViewContent" class="memo-text" style="font-size:13px;line-height:1.7;word-break:break-all;min-height:20px"></div>
+          <div id="contestViewDatesWrap" style="display:none">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">일정 (클릭으로 상태 변경)</div>
+            <div id="contestViewDates" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+          <div id="contestViewImagesWrap" style="display:none">
+            <div id="contestViewImages" style="display:flex;flex-wrap:wrap;gap:8px"></div>
+          </div>
         </div>
       </div>
-      <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
-        <input id="contestNameInput" type="text" placeholder="대회 이름" style="width:100%;height:38px;padding:0 12px;background:var(--bg3);border:1px solid var(--line2);color:var(--text);font-size:14px;font-weight:700;outline:none">
-        <textarea id="contestContentInput" class="contest-textarea" rows="5" placeholder="&lt;t&gt;26.7.1 예선/&#10;&lt;u&gt;https://대회사이트/&#10;&lt;d&gt;'일정이름'/&#10;&lt;bold&gt;중요/"></textarea>
-        <div id="contestPreview" style="display:none;font-size:13px;line-height:1.7;color:var(--text);padding:10px;background:var(--bg3);border:1px solid var(--line2)"></div>
-        <div id="contestDatesWrap" style="display:none">
-          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">파싱된 날짜 (클릭으로 상태 변경)</div>
-          <div id="contestDatesChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+
+      <!-- Edit mode -->
+      <div id="contestEditMode" style="display:none">
+        <div class="panel-head">
+          <input id="contestNameInput" type="text" placeholder="대회 이름" style="flex:1;min-width:0;height:30px;padding:0 10px;background:var(--bg3);border:1px solid var(--line2);color:var(--text);font-size:13px;font-weight:700;outline:none">
+          <div style="display:flex;gap:8px;flex-shrink:0">
+            <button class="hbtn danger" id="contestDeleteBtn" type="button" style="display:none">삭제</button>
+            <button class="hbtn" id="contestCancelEditBtn" type="button">취소</button>
+            <button class="hbtn primary" id="contestSaveBtn" type="button">저장</button>
+          </div>
         </div>
-        <div>
-          <div style="font-size:12px;color:var(--muted);margin-bottom:8px">이미지</div>
-          <div id="contestImagesWrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
-          <input type="file" id="contestImgInput" multiple accept="image/*" style="display:none">
-          <button class="hbtn" id="contestImgBtn" type="button">이미지 추가</button>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:12px">
+          <textarea id="contestContentInput" class="contest-textarea" rows="5" placeholder="&lt;t&gt;26.7.1 예선/&#10;&lt;u&gt;https://대회사이트/&#10;&lt;d&gt;'일정이름'/&#10;&lt;bold&gt;중요/"></textarea>
+          <div id="contestDatesWrap" style="display:none">
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">파싱된 날짜 (클릭으로 상태 변경)</div>
+            <div id="contestDatesChips" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+          <div>
+            <div style="font-size:12px;color:var(--muted);margin-bottom:8px">이미지</div>
+            <div id="contestImagesWrap" style="display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px"></div>
+            <input type="file" id="contestImgInput" multiple accept="image/*" style="display:none">
+            <button class="hbtn" id="contestImgBtn" type="button">이미지 추가</button>
+          </div>
         </div>
       </div>
+
     </div>
   </div>
 
@@ -1438,6 +1462,7 @@ $('#uploadDate').value = today();
 let _contests = [];
 let _editingContest = null;
 let _localDates = [];
+let _contestImgPending = [];
 
 function parseContestDates(content) {
   const dates = [];
@@ -1452,100 +1477,10 @@ function parseContestDates(content) {
   return dates;
 }
 
-function renderContestContent(content) {
+function contestLinkify(content) {
   if (!content) return '';
-  let html = content
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-  // <u>url/ — greedy to last / on the line
-  html = html.replace(/&lt;u&gt;([^\n]+?)\//g, (_, url) => {
-    const safe = url.trim();
-    return `<a href="${safe}" target="_blank" rel="noreferrer" style="color:#60a5fa;word-break:break-all">${safe}</a>`;
-  });
-  // <bold>text/
-  html = html.replace(/&lt;bold&gt;([^/\n]+)\//g, (_, t) => `<strong>${t}</strong>`);
-  // <d>'name'/ or <d>name/
-  html = html.replace(/&lt;d&gt;[ \t]*(?:'([^'\n]+)'|([^/\n]+?))\//g, (_, a, b) =>
-    `<span style="color:var(--good);font-size:12px">${(a || b).trim()}</span>`);
-  // <t>YY.MM.DD label/
-  html = html.replace(/&lt;t&gt;\d{2}\.\d{1,2}\.\d{1,2}[^\n]*\//g, '');
-  html = html.replace(/\n/g, '<br>');
-  return html;
-}
-
-function renderLocalDates() {
-  const wrap = $('#contestDatesWrap');
-  const chips = $('#contestDatesChips');
-  if (!_localDates.length) { wrap.style.display = 'none'; return; }
-  wrap.style.display = '';
-  chips.innerHTML = '';
-  _localDates.forEach((d, i) => {
-    const btn = document.createElement('button');
-    btn.type = 'button';
-    btn.className = `contest-chip${d.state === 1 ? ' state-1' : d.state === 2 ? ' state-2' : ''}`;
-    btn.textContent = d.label ? `${d.date} ${d.label}` : d.date;
-    btn.addEventListener('click', () => {
-      _localDates[i].state = (_localDates[i].state + 1) % 3;
-      renderLocalDates();
-    });
-    chips.appendChild(btn);
-  });
-}
-
-function syncDatesFromContent() {
-  const val = $('#contestContentInput').value;
-  const parsed = parseContestDates(val);
-  _localDates = parsed.map((p) => {
-    const existing = (_editingContest ? (_editingContest.dates || []) : []).find((e) => e.date === p.date && e.label === p.label);
-    return { ...p, state: existing ? (existing.state ?? 0) : 0 };
-  });
-  renderLocalDates();
-  const preview = $('#contestPreview');
-  const rendered = renderContestContent(val);
-  if (rendered.trim()) {
-    preview.innerHTML = rendered;
-    preview.style.display = '';
-  } else {
-    preview.style.display = 'none';
-  }
-}
-
-function renderContestImages(images) {
-  const wrap = $('#contestImagesWrap');
-  wrap.innerHTML = (images || []).map((img) =>
-    `<img class="contest-img-thumb" src="${img.url}" alt="${img.originalName || ''}">`
-  ).join('');
-}
-
-function openContestEditor(contest) {
-  _editingContest = contest || null;
-  const isNew = !contest;
-  $('#contestEditorTitle').textContent = isNew ? '새 대회' : '대회 수정';
-  $('#contestDeleteBtn').style.display = isNew ? 'none' : '';
-  $('#contestNameInput').value = contest ? contest.name : '';
-  $('#contestContentInput').value = contest ? contest.content : '';
-  _localDates = (contest ? contest.dates || [] : []).map((d) => ({ ...d }));
-  renderLocalDates();
-  const preview = $('#contestPreview');
-  const rendered = renderContestContent(contest ? contest.content : '');
-  if (rendered.trim()) { preview.innerHTML = rendered; preview.style.display = ''; }
-  else { preview.style.display = 'none'; }
-  renderContestImages(contest ? contest.images : []);
-  $('#contestEditorWrap').style.display = '';
-  $('#contestEditorWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
-}
-
-function closeContestEditor() {
-  $('#contestEditorWrap').style.display = 'none';
-  _editingContest = null;
-  _localDates = [];
-}
-
-async function loadContests() {
-  try {
-    const data = await api('/api/contests');
-    _contests = data.contests || [];
-  } catch { _contests = []; }
-  renderContestList();
+  const withoutT = content.replace(/<t>\d{2}\.\d{1,2}\.\d{1,2}[^\n]*/g, '').replace(/\n{3,}/g, '\n\n').trim();
+  return linkify(withoutT);
 }
 
 function contestUrgencyKey(c) {
@@ -1557,26 +1492,27 @@ function contestUrgencyKey(c) {
 }
 
 function daysUntil(dateStr) {
-  const t = today();
   if (!dateStr || dateStr.startsWith('~')) return null;
-  const diff = Math.ceil((new Date(dateStr) - new Date(t)) / 86400000);
-  return diff;
+  return Math.ceil((new Date(dateStr) - new Date(today())) / 86400000);
+}
+
+async function loadContests() {
+  try {
+    const data = await api('/api/contests');
+    _contests = data.contests || [];
+  } catch { _contests = []; }
+  renderContestList();
 }
 
 function renderContestList() {
   const el = $('#contestList');
-  if (!_contests.length) {
-    el.innerHTML = '<div class="empty">대회를 추가해 보세요.</div>';
-    return;
-  }
+  if (!_contests.length) { el.innerHTML = '<div class="empty">대회를 추가해 보세요.</div>'; return; }
   const sorted = [..._contests].sort((a, b) => contestUrgencyKey(a).localeCompare(contestUrgencyKey(b)));
   el.innerHTML = '';
   for (const c of sorted) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'contest-card';
-    const dateCount = (c.dates || []).length;
-    const imgCount = (c.images || []).length;
     const key = contestUrgencyKey(c);
     const d = daysUntil(key);
     let badge = '';
@@ -1586,15 +1522,146 @@ function renderContestList() {
       else if (d <= 14) badge = `<span style="color:#f59e0b;font-size:12px">D-${d}</span>`;
       else badge = `<span style="color:var(--muted);font-size:12px">D-${d}</span>`;
     }
-    btn.innerHTML = `<div><div class="contest-card-name" style="display:flex;align-items:center;gap:8px">${c.name.replace(/&/g,'&amp;').replace(/</g,'&lt;')} ${badge}</div><div class="contest-card-meta">${dateCount}개 일정${imgCount ? ` · 이미지 ${imgCount}장` : ''}</div></div><span style="color:var(--muted);font-size:18px">›</span>`;
-    btn.addEventListener('click', () => openContestEditor(c));
+    const dateCount = (c.dates || []).length;
+    const imgCount = (c.images || []).length;
+    const esc = c.name.replace(/&/g,'&amp;').replace(/</g,'&lt;');
+    btn.innerHTML = `<div><div class="contest-card-name" style="display:flex;align-items:center;gap:8px">${esc} ${badge}</div><div class="contest-card-meta">${dateCount}개 일정${imgCount ? ` · 이미지 ${imgCount}장` : ''}</div></div><span style="color:var(--muted);font-size:18px">›</span>`;
+    btn.addEventListener('click', () => openContestView(c));
     el.appendChild(btn);
   }
 }
 
-$('#contestAddBtn').addEventListener('click', () => openContestEditor(null));
-$('#contestCancelBtn').addEventListener('click', closeContestEditor);
-$('#contestContentInput').addEventListener('input', syncDatesFromContent);
+// ── View mode ──
+function openContestView(contest) {
+  _editingContest = contest;
+  // Render content
+  const contentEl = $('#contestViewContent');
+  const rendered = contestLinkify(contest.content || '');
+  if (rendered.trim()) { contentEl.innerHTML = rendered; contentEl.classList.remove('empty'); }
+  else { contentEl.innerHTML = ''; contentEl.classList.add('empty'); }
+  $('#contestViewName').textContent = contest.name;
+  // Dates
+  renderViewDates(contest.dates || []);
+  // Images
+  renderViewImages(contest.images || []);
+  // Show view mode
+  $('#contestViewMode').style.display = '';
+  $('#contestEditMode').style.display = 'none';
+  $('#contestViewWrap').style.display = '';
+  $('#contestViewWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function renderViewDates(dates) {
+  const wrap = $('#contestViewDatesWrap');
+  const chips = $('#contestViewDates');
+  if (!dates.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  chips.innerHTML = '';
+  dates.forEach((d, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `contest-chip${d.state === 1 ? ' state-1' : d.state === 2 ? ' state-2' : ''}`;
+    btn.textContent = d.label ? `${d.date} ${d.label}` : d.date;
+    btn.addEventListener('click', async () => {
+      if (!state.token) return;
+      const next = ((d.state ?? 0) + 1) % 3;
+      d.state = next;
+      btn.className = `contest-chip${next === 1 ? ' state-1' : next === 2 ? ' state-2' : ''}`;
+      try {
+        const newDates = (_editingContest.dates || []).map((dd, j) => j === i ? { ...dd, state: next } : dd);
+        await api(`/api/contests/${_editingContest.id}`, {
+          method: 'PUT',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ name: _editingContest.name, content: _editingContest.content, dates: newDates })
+        });
+        _editingContest.dates = newDates;
+        const idx = _contests.findIndex((c) => c.id === _editingContest.id);
+        if (idx >= 0) _contests[idx] = { ..._contests[idx], dates: newDates };
+        await loadCalendarEvents(state.calendarMonth);
+        renderCalendar();
+      } catch (e) { toast(e.message); }
+    });
+    chips.appendChild(btn);
+  });
+}
+
+function renderViewImages(images) {
+  const wrap = $('#contestViewImagesWrap');
+  const el = $('#contestViewImages');
+  if (!images.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  el.innerHTML = '';
+  images.forEach((img, i) => {
+    const thumb = document.createElement('img');
+    thumb.className = 'contest-img-thumb';
+    thumb.src = img.url;
+    thumb.alt = img.originalName || '';
+    thumb.style.cursor = 'pointer';
+    thumb.addEventListener('click', () => {
+      state.currentPhotos = images.map((im) => ({ url: im.url, originalName: im.originalName || '', isImage: true }));
+      openGallery(i);
+    });
+    el.appendChild(thumb);
+  });
+}
+
+$('#contestViewCloseBtn').addEventListener('click', () => {
+  $('#contestViewWrap').style.display = 'none';
+  _editingContest = null;
+});
+$('#contestViewEditBtn').addEventListener('click', enterContestEdit);
+
+// ── Edit mode ──
+function enterContestEdit() {
+  const c = _editingContest;
+  $('#contestNameInput').value = c ? c.name : '';
+  $('#contestContentInput').value = c ? c.content : '';
+  $('#contestDeleteBtn').style.display = (c && c.id) ? '' : 'none';
+  _localDates = (c ? c.dates || [] : []).map((d) => ({ ...d }));
+  _contestImgPending = [];
+  renderEditDates();
+  renderEditImages(c ? c.images || [] : []);
+  $('#contestViewMode').style.display = 'none';
+  $('#contestEditMode').style.display = '';
+}
+
+function renderEditDates() {
+  const wrap = $('#contestDatesWrap');
+  const chips = $('#contestDatesChips');
+  if (!_localDates.length) { wrap.style.display = 'none'; return; }
+  wrap.style.display = '';
+  chips.innerHTML = '';
+  _localDates.forEach((d, i) => {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.className = `contest-chip${d.state === 1 ? ' state-1' : d.state === 2 ? ' state-2' : ''}`;
+    btn.textContent = d.label ? `${d.date} ${d.label}` : d.date;
+    btn.addEventListener('click', () => { _localDates[i].state = (_localDates[i].state + 1) % 3; renderEditDates(); });
+    chips.appendChild(btn);
+  });
+}
+
+function renderEditImages(images) {
+  const wrap = $('#contestImagesWrap');
+  wrap.innerHTML = (images || []).map((img) =>
+    `<img class="contest-img-thumb" src="${img.url}" alt="${img.originalName || ''}">`
+  ).join('');
+}
+
+$('#contestContentInput').addEventListener('input', () => {
+  const val = $('#contestContentInput').value;
+  const parsed = parseContestDates(val);
+  _localDates = parsed.map((p) => {
+    const existing = (_editingContest ? (_editingContest.dates || []) : []).find((e) => e.date === p.date && e.label === p.label);
+    return { ...p, state: existing ? (existing.state ?? 0) : 0 };
+  });
+  renderEditDates();
+});
+
+$('#contestCancelEditBtn').addEventListener('click', () => {
+  if (_editingContest && _editingContest.id) { openContestView(_editingContest); }
+  else { $('#contestViewWrap').style.display = 'none'; _editingContest = null; }
+});
 
 $('#contestSaveBtn').addEventListener('click', async () => {
   const name = $('#contestNameInput').value.trim();
@@ -1602,26 +1669,27 @@ $('#contestSaveBtn').addEventListener('click', async () => {
   if (!name) { toast('대회 이름을 입력해 주세요.'); return; }
   const dates = _localDates.map((d) => ({ date: d.date, label: d.label || '', state: d.state ?? 0 }));
   try {
-    const method = _editingContest ? 'PUT' : 'POST';
-    const url = _editingContest ? `/api/contests/${_editingContest.id}` : '/api/contests';
+    const isNew = !(_editingContest && _editingContest.id);
+    const method = isNew ? 'POST' : 'PUT';
+    const url = isNew ? '/api/contests' : `/api/contests/${_editingContest.id}`;
     const data = await api(url, {
-      method,
-      headers: { 'content-type': 'application/json' },
+      method, headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ name, content, dates })
     });
     _editingContest = data.contest;
-    if (_contestImgPending && _contestImgPending.length) {
+    if (_contestImgPending.length) {
       const fd = new FormData();
       for (const f of _contestImgPending) fd.append('images', f);
-      await fetch(`/api/contests/${data.contest.id}/images`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${state.token}` },
-        body: fd
+      const r = await fetch(`/api/contests/${data.contest.id}/images`, {
+        method: 'POST', headers: { Authorization: `Bearer ${state.token}` }, body: fd
       });
+      const rd = await r.json();
+      if (r.ok) _editingContest.images = rd.images;
       _contestImgPending = [];
     }
     await loadContests();
-    closeContestEditor();
+    const saved = _contests.find((c) => c.id === _editingContest.id) || _editingContest;
+    openContestView(saved);
     await loadCalendarEvents(state.calendarMonth);
     renderCalendar();
     toast('저장되었습니다.');
@@ -1633,15 +1701,30 @@ $('#contestDeleteBtn').addEventListener('click', async () => {
   if (!confirm(`"${_editingContest.name}" 대회를 삭제할까요?`)) return;
   try {
     await api(`/api/contests/${_editingContest.id}`, { method: 'DELETE' });
+    $('#contestViewWrap').style.display = 'none';
+    _editingContest = null;
     await loadContests();
-    closeContestEditor();
     await loadCalendarEvents(state.calendarMonth);
     renderCalendar();
     toast('삭제되었습니다.');
   } catch (e) { toast(e.message || '삭제 실패'); }
 });
 
-let _contestImgPending = [];
+$('#contestAddBtn').addEventListener('click', () => {
+  _editingContest = null;
+  $('#contestViewMode').style.display = 'none';
+  $('#contestEditMode').style.display = '';
+  $('#contestViewWrap').style.display = '';
+  $('#contestNameInput').value = '';
+  $('#contestContentInput').value = '';
+  $('#contestDeleteBtn').style.display = 'none';
+  _localDates = [];
+  _contestImgPending = [];
+  renderEditDates();
+  renderEditImages([]);
+  $('#contestViewWrap').scrollIntoView({ behavior: 'smooth', block: 'start' });
+});
+
 $('#contestImgBtn').addEventListener('click', () => $('#contestImgInput').click());
 $('#contestImgInput').addEventListener('change', async (e) => {
   const files = Array.from(e.target.files || []);
@@ -1652,19 +1735,17 @@ $('#contestImgInput').addEventListener('change', async (e) => {
     for (const f of files) fd.append('images', f);
     try {
       const res = await fetch(`/api/contests/${_editingContest.id}/images`, {
-        method: 'POST',
-        headers: { Authorization: `Bearer ${state.token}` },
-        body: fd
+        method: 'POST', headers: { Authorization: `Bearer ${state.token}` }, body: fd
       });
       const data = await res.json();
       if (!res.ok) { toast(data.error || '이미지 업로드 실패'); return; }
       _editingContest.images = data.images;
-      renderContestImages(data.images);
+      renderEditImages(data.images);
       toast('이미지 업로드 완료');
     } catch { toast('이미지 업로드 실패'); }
   } else {
     _contestImgPending = [..._contestImgPending, ...files];
-    renderContestImages(_contestImgPending.map((f) => ({ url: URL.createObjectURL(f), originalName: f.name })));
+    renderEditImages(_contestImgPending.map((f) => ({ url: URL.createObjectURL(f), originalName: f.name })));
   }
 });
 // ────────────────────────────────────────────────────
