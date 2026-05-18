@@ -383,177 +383,151 @@ input[type="file"]{width:100%;color:var(--muted)}
       <h1>학사일정</h1>
       <p>2026년 연간 학사일정입니다.</p>
     </div>
-    <div style="display:flex;gap:8px">
-      <button class="hbtn sched-tab-btn active" id="schedTab1" type="button">가. 1학기</button>
-      <button class="hbtn sched-tab-btn" id="schedTab2" type="button">나. 2학기</button>
-    </div>
   </div>
 
-  <!-- 1학기 -->
-  <div id="sched1">
-    <div class="sched-months">
+  <div class="sched-months">
 
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">3</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">1</span><span class="sched-e holiday">삼일절 🚫</span></li>
-          <li><span class="sched-d">2</span><span class="sched-e holiday">대체휴일 🚫</span></li>
-          <li><span class="sched-d">3</span><span class="sched-e">입학식 · 개학식</span></li>
-          <li><span class="sched-d">4~10</span><span class="sched-e">2·3학년 집중상담주간 (4,5,9,10)</span></li>
-          <li><span class="sched-d">11~13</span><span class="sched-e">1학년 수련회</span></li>
-          <li><span class="sched-d">16~19</span><span class="sched-e">3학년 집중상담주간 · 상견례(18)</span></li>
-          <li><span class="sched-d">23~26</span><span class="sched-e">전국연합학력평가(24) · 서울시 학부모총회(23,24,26)</span></li>
-          <li><span class="sched-d">31</span><span class="sched-e">학부모아카데미 1차</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">4</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">7</span><span class="sched-e">학부모아카데미 2차</span></li>
-          <li><span class="sched-d">14</span><span class="sched-e">학부모아카데미 3차</span></li>
-          <li><span class="sched-d">21</span><span class="sched-e">학부모아카데미 4차</span></li>
-          <li><span class="sched-d">28</span><span class="sched-e">학부모아카데미 5차</span></li>
-          <li><span class="sched-d">29~5/1</span><span class="sched-e exam">중간고사 (중학교)</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">5</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">1</span><span class="sched-e holiday">노동절 🚫</span></li>
-          <li><span class="sched-d">4,6~8</span><span class="sched-e exam">중간고사 · 어린이날(5)</span></li>
-          <li><span class="sched-d">13</span><span class="sched-e">3학년 현장체험학습 · 1·2학년 유연찬일</span></li>
-          <li><span class="sched-d">14</span><span class="sched-e">체육한마당</span></li>
-          <li><span class="sched-d">15</span><span class="sched-e holiday">학교장 체험휴업일 🚫</span></li>
-          <li><span class="sched-d">22</span><span class="sched-e">중학교 체육대회</span></li>
-          <li><span class="sched-d">24</span><span class="sched-e holiday">부처님오신날 🚫</span></li>
-          <li><span class="sched-d">25</span><span class="sched-e holiday">부처님오신날 대체휴일 🚫</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">6</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">2</span><span class="sched-e holiday">현충일 🚫</span></li>
-          <li><span class="sched-d">3</span><span class="sched-e holiday">2026 지방선거 🚫</span></li>
-          <li><span class="sched-d">4</span><span class="sched-e">전국연합학력평가 · 전국연합 협동평가</span></li>
-          <li><span class="sched-d">6</span><span class="sched-e">전국연합 협동평가 (부산시·평가원)</span></li>
-          <li><span class="sched-d">29~7/2</span><span class="sched-e exam">기말고사 (중학교)</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">7</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">6~10</span><span class="sched-e exam">기말고사</span></li>
-          <li><span class="sched-d">9</span><span class="sched-e">전학공 결과 발표 데이</span></li>
-          <li><span class="sched-d">13</span><span class="sched-e">3학년 모의고사 (인/사시)</span></li>
-          <li><span class="sched-d">14~16</span><span class="sched-e">방학교자율교육과정 주간</span></li>
-          <li><span class="sched-d">17</span><span class="sched-e holiday">제헌절 🚫</span></li>
-          <li><span class="sched-d">20</span><span class="sched-e">중학교 방학식</span></li>
-          <li><span class="sched-d">22</span><span class="sched-e">방학식 🏖</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">8</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">13</span><span class="sched-e">개학 📚</span></li>
-          <li><span class="sched-d">15</span><span class="sched-e holiday">광복절 🚫</span></li>
-          <li><span class="sched-d">17</span><span class="sched-e holiday">광복절 대체휴일 🚫</span></li>
-          <li><span class="sched-d">18</span><span class="sched-e">중학교 개학</span></li>
-        </ul>
-      </div>
-
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">1</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">1</span><span class="sched-e holiday">신정 🚫</span></li>
+        <li><span class="sched-d">15</span><span class="sched-e exam">졸업·진급 사정회</span></li>
+        <li><span class="sched-d">28~30</span><span class="sched-e holiday">설날 연휴 🚫</span></li>
+      </ul>
     </div>
-  </div>
 
-  <!-- 2학기 -->
-  <div id="sched2" class="hidden">
-    <div class="sched-months">
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">8</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">13</span><span class="sched-e">개학 📚 · 자율1(3학년예비), 진로2</span></li>
-          <li><span class="sched-d">15</span><span class="sched-e holiday">광복절 🚫</span></li>
-          <li><span class="sched-d">17</span><span class="sched-e holiday">광복절 대체휴일 🚫</span></li>
-          <li><span class="sched-d">18</span><span class="sched-e">중학교 개학</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">9</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">2</span><span class="sched-e">전국연합학력평가 · 국가수준 학업성취도평가(2학년)</span></li>
-          <li><span class="sched-d">4</span><span class="sched-e">국가수준 학업성취도평가 2학년 2개학급</span></li>
-          <li><span class="sched-d">10</span><span class="sched-e">1차 입학설명회</span></li>
-          <li><span class="sched-d">24~26</span><span class="sched-e holiday">추석 연휴 🚫</span></li>
-          <li><span class="sched-d">30~10/2</span><span class="sched-e exam">중간고사 (중학교)</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">10</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">3</span><span class="sched-e holiday">개천절 🚫</span></li>
-          <li><span class="sched-d">5</span><span class="sched-e holiday">개천절 대체휴일 🚫</span></li>
-          <li><span class="sched-d">9</span><span class="sched-e holiday">한글날 🚫</span></li>
-          <li><span class="sched-d">13~16</span><span class="sched-e exam">1·2학년 중간 / 3학년 기말</span></li>
-          <li><span class="sched-d">20~23</span><span class="sched-e">1학년 수학여행 · 전국연합학력평가(20) · 경기도·서울시</span></li>
-          <li><span class="sched-d">25</span><span class="sched-e">오랑인 장의페스타 (중학교 행사)</span></li>
-          <li><span class="sched-d">27</span><span class="sched-e">학부모 총회</span></li>
-          <li><span class="sched-d">29</span><span class="sched-e">2차 입학설명회</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">11</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">9~12</span><span class="sched-e exam">3학년 기말고사 (중학교)</span></li>
-          <li><span class="sched-d">19</span><span class="sched-e" style="color:#f59e0b;font-weight:700">🎓 대학수학능력시험</span></li>
-          <li><span class="sched-d">24~26</span><span class="sched-e">학부모 집중상담주간</span></li>
-          <li><span class="sched-d">28</span><span class="sched-e">3차 입학설명회</span></li>
-          <li><span class="sched-d">30~12/4</span><span class="sched-e">신입생 사회통합전형 서류 심사</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">12</span><span class="sched-month-label">월</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">7~10</span><span class="sched-e exam">1·2학년 기말고사 (중학교 7~10)</span></li>
-          <li><span class="sched-d">9</span><span class="sched-e">전학공 결과 발표 데이</span></li>
-          <li><span class="sched-d">10</span><span class="sched-e">개교기념예배 · 개교기념 재창업일</span></li>
-          <li><span class="sched-d">16~22</span><span class="sched-e">운영화주간 · 신입생 면접(17,21,22)</span></li>
-          <li><span class="sched-d">18</span><span class="sched-e">신입생 원서접수 마감</span></li>
-          <li><span class="sched-d">25</span><span class="sched-e holiday">성탄절 🚫</span></li>
-          <li><span class="sched-d">28</span><span class="sched-e">신입생 최종합격자 발표 (2026.12.28 월)</span></li>
-          <li><span class="sched-d">31</span><span class="sched-e">방학식 🏖</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">1</span><span class="sched-month-label">월 (2027)</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">1</span><span class="sched-e holiday">신정 🚫</span></li>
-          <li><span class="sched-d">8</span><span class="sched-e exam">졸업·진급 사정회 · 중학교 졸업식</span></li>
-        </ul>
-      </div>
-
-      <div class="sched-month">
-        <div class="sched-month-head"><span class="sched-month-num">2</span><span class="sched-month-label">월 (2027)</span></div>
-        <ul class="sched-list">
-          <li><span class="sched-d">3</span><span class="sched-e">3학년 등교일(1~3) · 졸업식</span></li>
-          <li><span class="sched-d">4~5</span><span class="sched-e">1·2학년 등교일 · 보직교사협의회</span></li>
-          <li><span class="sched-d">6~8</span><span class="sched-e holiday">설날 연휴 🚫</span></li>
-          <li><span class="sched-d">9</span><span class="sched-e holiday">설날 대체휴일 🚫</span></li>
-          <li><span class="sched-d">18~19</span><span class="sched-e">1·2학년 등교일</span></li>
-          <li><span class="sched-d">22~24</span><span class="sched-e">신학년 집중 준비기간</span></li>
-        </ul>
-      </div>
-
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">2</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">3</span><span class="sched-e">3학년 등교일 · 졸업식</span></li>
+        <li><span class="sched-d">4~5</span><span class="sched-e">1·2학년 등교일</span></li>
+        <li><span class="sched-d">9~11</span><span class="sched-e">신학년 집중 준비기간</span></li>
+      </ul>
     </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">3</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">1</span><span class="sched-e holiday">삼일절 🚫</span></li>
+        <li><span class="sched-d">2</span><span class="sched-e holiday">대체휴일 🚫</span></li>
+        <li><span class="sched-d">3</span><span class="sched-e">입학식 · 개학식</span></li>
+        <li><span class="sched-d">4~10</span><span class="sched-e">2·3학년 집중상담주간 (4,5,9,10)</span></li>
+        <li><span class="sched-d">11~13</span><span class="sched-e">1학년 수련회</span></li>
+        <li><span class="sched-d">16~19</span><span class="sched-e">3학년 집중상담주간 · 상견례(18)</span></li>
+        <li><span class="sched-d">23~26</span><span class="sched-e">전국연합학력평가(24) · 서울시 학부모총회(23,24,26)</span></li>
+        <li><span class="sched-d">31</span><span class="sched-e">학부모아카데미 1차</span></li>
+      </ul>
+    </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">4</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">7</span><span class="sched-e">학부모아카데미 2차</span></li>
+        <li><span class="sched-d">14</span><span class="sched-e">학부모아카데미 3차</span></li>
+        <li><span class="sched-d">21</span><span class="sched-e">학부모아카데미 4차</span></li>
+        <li><span class="sched-d">28</span><span class="sched-e">학부모아카데미 5차</span></li>
+        <li><span class="sched-d">29~5/1</span><span class="sched-e exam">중간고사 (중학교)</span></li>
+      </ul>
+    </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">5</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">1</span><span class="sched-e holiday">노동절 🚫</span></li>
+        <li><span class="sched-d">4,6~8</span><span class="sched-e exam">중간고사 · 어린이날(5)</span></li>
+        <li><span class="sched-d">13</span><span class="sched-e">3학년 현장체험학습 · 1·2학년 유연찬일</span></li>
+        <li><span class="sched-d">14</span><span class="sched-e">체육한마당</span></li>
+        <li><span class="sched-d">15</span><span class="sched-e holiday">학교장 체험휴업일 🚫</span></li>
+        <li><span class="sched-d">22</span><span class="sched-e">중학교 체육대회</span></li>
+        <li><span class="sched-d">24</span><span class="sched-e holiday">부처님오신날 🚫</span></li>
+        <li><span class="sched-d">25</span><span class="sched-e holiday">부처님오신날 대체휴일 🚫</span></li>
+      </ul>
+    </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">6</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">2</span><span class="sched-e holiday">현충일 🚫</span></li>
+        <li><span class="sched-d">3</span><span class="sched-e holiday">2026 지방선거 🚫</span></li>
+        <li><span class="sched-d">4</span><span class="sched-e">전국연합학력평가 · 전국연합 협동평가</span></li>
+        <li><span class="sched-d">6</span><span class="sched-e">전국연합 협동평가 (부산시·평가원)</span></li>
+        <li><span class="sched-d">29~7/2</span><span class="sched-e exam">기말고사 (중학교)</span></li>
+      </ul>
+    </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">7</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">6~10</span><span class="sched-e exam">기말고사</span></li>
+        <li><span class="sched-d">9</span><span class="sched-e">전학공 결과 발표 데이</span></li>
+        <li><span class="sched-d">13</span><span class="sched-e">3학년 모의고사 (인/사시)</span></li>
+        <li><span class="sched-d">14~16</span><span class="sched-e">방학교자율교육과정 주간</span></li>
+        <li><span class="sched-d">17</span><span class="sched-e holiday">제헌절 🚫</span></li>
+        <li><span class="sched-d">20</span><span class="sched-e">중학교 방학식</span></li>
+        <li><span class="sched-d">22</span><span class="sched-e">방학식 🏖</span></li>
+      </ul>
+    </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">8</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">13</span><span class="sched-e">개학 📚 · 자율1(3학년예비), 진로2</span></li>
+        <li><span class="sched-d">15</span><span class="sched-e holiday">광복절 🚫</span></li>
+        <li><span class="sched-d">17</span><span class="sched-e holiday">광복절 대체휴일 🚫</span></li>
+        <li><span class="sched-d">18</span><span class="sched-e">중학교 개학</span></li>
+      </ul>
+    </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">9</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">2</span><span class="sched-e">전국연합학력평가 · 국가수준 학업성취도평가(2학년)</span></li>
+        <li><span class="sched-d">4</span><span class="sched-e">국가수준 학업성취도평가 2학년 2개학급</span></li>
+        <li><span class="sched-d">10</span><span class="sched-e">1차 입학설명회</span></li>
+        <li><span class="sched-d">24~26</span><span class="sched-e holiday">추석 연휴 🚫</span></li>
+        <li><span class="sched-d">30~10/2</span><span class="sched-e exam">중간고사 (중학교)</span></li>
+      </ul>
+    </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">10</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">3</span><span class="sched-e holiday">개천절 🚫</span></li>
+        <li><span class="sched-d">5</span><span class="sched-e holiday">개천절 대체휴일 🚫</span></li>
+        <li><span class="sched-d">9</span><span class="sched-e holiday">한글날 🚫</span></li>
+        <li><span class="sched-d">13~16</span><span class="sched-e exam">1·2학년 중간 / 3학년 기말</span></li>
+        <li><span class="sched-d">20~23</span><span class="sched-e">1학년 수학여행 · 전국연합학력평가(20) · 경기도·서울시</span></li>
+        <li><span class="sched-d">25</span><span class="sched-e">오랑인 장의페스타 (중학교 행사)</span></li>
+        <li><span class="sched-d">27</span><span class="sched-e">학부모 총회</span></li>
+        <li><span class="sched-d">29</span><span class="sched-e">2차 입학설명회</span></li>
+      </ul>
+    </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">11</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">9~12</span><span class="sched-e exam">3학년 기말고사 (중학교)</span></li>
+        <li><span class="sched-d">19</span><span class="sched-e" style="color:#f59e0b;font-weight:700">🎓 대학수학능력시험</span></li>
+        <li><span class="sched-d">24~26</span><span class="sched-e">학부모 집중상담주간</span></li>
+        <li><span class="sched-d">28</span><span class="sched-e">3차 입학설명회</span></li>
+        <li><span class="sched-d">30~12/4</span><span class="sched-e">신입생 사회통합전형 서류 심사</span></li>
+      </ul>
+    </div>
+
+    <div class="sched-month">
+      <div class="sched-month-head"><span class="sched-month-num">12</span><span class="sched-month-label">월</span></div>
+      <ul class="sched-list">
+        <li><span class="sched-d">7~10</span><span class="sched-e exam">1·2학년 기말고사 (중학교 7~10)</span></li>
+        <li><span class="sched-d">9</span><span class="sched-e">전학공 결과 발표 데이</span></li>
+        <li><span class="sched-d">10</span><span class="sched-e">개교기념예배 · 개교기념 재창업일</span></li>
+        <li><span class="sched-d">16~22</span><span class="sched-e">운영화주간 · 신입생 면접(17,21,22)</span></li>
+        <li><span class="sched-d">18</span><span class="sched-e">신입생 원서접수 마감</span></li>
+        <li><span class="sched-d">25</span><span class="sched-e holiday">성탄절 🚫</span></li>
+        <li><span class="sched-d">28</span><span class="sched-e">신입생 최종합격자 발표</span></li>
+        <li><span class="sched-d">31</span><span class="sched-e">방학식 🏖</span></li>
+      </ul>
+    </div>
+
   </div>
 </main>
 
@@ -1370,18 +1344,6 @@ async function saveStudyCell(day, slot, text) {
 $('#tabCalendar').addEventListener('click', () => setPage('calendar'));
 $('#tabStudy').addEventListener('click', () => setPage('study'));
 $('#tabSchedule').addEventListener('click', () => setPage('schedule'));
-$('#schedTab1').addEventListener('click', () => {
-  $('#sched1').classList.remove('hidden');
-  $('#sched2').classList.add('hidden');
-  $('#schedTab1').classList.add('active');
-  $('#schedTab2').classList.remove('active');
-});
-$('#schedTab2').addEventListener('click', () => {
-  $('#sched2').classList.remove('hidden');
-  $('#sched1').classList.add('hidden');
-  $('#schedTab2').classList.add('active');
-  $('#schedTab1').classList.remove('active');
-});
 
 $('#studyPrevBtn').addEventListener('click', () => {
   const d = new Date(state.studyWeek + 'T12:00:00');
