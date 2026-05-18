@@ -1514,20 +1514,45 @@ async function loadContests() {
   renderContestList();
 }
 
+function contestUrgencyKey(c) {
+  const t = today();
+  const upcoming = (c.dates || []).map((d) => d.date).filter((d) => d && d >= t).sort();
+  if (upcoming.length) return upcoming[0];
+  const past = (c.dates || []).map((d) => d.date).filter(Boolean).sort();
+  return past.length ? '~' + past[past.length - 1] : '~~';
+}
+
+function daysUntil(dateStr) {
+  const t = today();
+  if (!dateStr || dateStr.startsWith('~')) return null;
+  const diff = Math.ceil((new Date(dateStr) - new Date(t)) / 86400000);
+  return diff;
+}
+
 function renderContestList() {
   const el = $('#contestList');
   if (!_contests.length) {
     el.innerHTML = '<div class="empty">대회를 추가해 보세요.</div>';
     return;
   }
+  const sorted = [..._contests].sort((a, b) => contestUrgencyKey(a).localeCompare(contestUrgencyKey(b)));
   el.innerHTML = '';
-  for (const c of _contests) {
+  for (const c of sorted) {
     const btn = document.createElement('button');
     btn.type = 'button';
     btn.className = 'contest-card';
     const dateCount = (c.dates || []).length;
     const imgCount = (c.images || []).length;
-    btn.innerHTML = `<div><div class="contest-card-name">${c.name.replace(/&/g,'&amp;').replace(/</g,'&lt;')}</div><div class="contest-card-meta">${dateCount}개 일정${imgCount ? ` · 이미지 ${imgCount}장` : ''}</div></div><span style="color:var(--muted);font-size:18px">›</span>`;
+    const key = contestUrgencyKey(c);
+    const d = daysUntil(key);
+    let badge = '';
+    if (d !== null) {
+      if (d === 0) badge = `<span style="color:#e05252;font-weight:700;font-size:12px">오늘!</span>`;
+      else if (d <= 3) badge = `<span style="color:#e05252;font-size:12px">D-${d}</span>`;
+      else if (d <= 14) badge = `<span style="color:#f59e0b;font-size:12px">D-${d}</span>`;
+      else badge = `<span style="color:var(--muted);font-size:12px">D-${d}</span>`;
+    }
+    btn.innerHTML = `<div><div class="contest-card-name" style="display:flex;align-items:center;gap:8px">${c.name.replace(/&/g,'&amp;').replace(/</g,'&lt;')} ${badge}</div><div class="contest-card-meta">${dateCount}개 일정${imgCount ? ` · 이미지 ${imgCount}장` : ''}</div></div><span style="color:var(--muted);font-size:18px">›</span>`;
     btn.addEventListener('click', () => openContestEditor(c));
     el.appendChild(btn);
   }
